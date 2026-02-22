@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: a37e164e6490648ec966f654d144932b
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 4890085278179872738
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/Scenes/MainSceneSettings.lighting
+  uploadId: 627568
