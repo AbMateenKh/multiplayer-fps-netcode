@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 9973c412032becb4ca116ca08be62edf
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Prefabs/Pickups/Loot_Health.prefab
+  uploadId: 627568

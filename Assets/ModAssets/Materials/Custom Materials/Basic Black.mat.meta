@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: dc263f8d5174d45c0a98e6489eca16c5
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/ModAssets/Materials/Custom Materials/Basic Black.mat
+  uploadId: 627568

@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: f981094eb6c2a6f4f8a56f85c606e3d1
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Prefabs/UI/WinGameMessage.prefab
+  uploadId: 627568

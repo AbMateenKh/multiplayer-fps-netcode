@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 01e098456aadb2c4480a8c5b62925e15
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Prefabs/Level/BaseObjects/Ramp_8m_Mesh.prefab
+  uploadId: 627568

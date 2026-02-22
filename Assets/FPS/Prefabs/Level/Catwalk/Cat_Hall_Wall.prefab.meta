@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: b77f5c4eeade4314eba8af8750deeb16
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Prefabs/Level/Catwalk/Cat_Hall_Wall.prefab
+  uploadId: 627568

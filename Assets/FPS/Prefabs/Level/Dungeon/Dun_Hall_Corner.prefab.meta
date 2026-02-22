@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: e523504ee4a69944d86007881a6784b2
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Prefabs/Level/Dungeon/Dun_Hall_Corner.prefab
+  uploadId: 627568

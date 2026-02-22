@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: b980668b312505d448004b943b4bc854
+DefaultImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Prefabs/RootObjects/Floor_Indented.mtl
+  uploadId: 627568

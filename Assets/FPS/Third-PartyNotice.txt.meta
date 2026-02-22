@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: cb83e91a00d95f74e8cbb29c4f6cdfed
+TextScriptImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Third-PartyNotice.txt
+  uploadId: 627568

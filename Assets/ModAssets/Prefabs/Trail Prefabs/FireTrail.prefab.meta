@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: dfa71f3ca0c2e408c855c56585bfbaad
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/ModAssets/Prefabs/Trail Prefabs/FireTrail.prefab
+  uploadId: 627568

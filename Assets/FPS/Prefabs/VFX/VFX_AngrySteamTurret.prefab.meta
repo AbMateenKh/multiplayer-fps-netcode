@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 80a1c11596afc5b4e99fcd0cc136f3ed
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Prefabs/VFX/VFX_AngrySteamTurret.prefab
+  uploadId: 627568

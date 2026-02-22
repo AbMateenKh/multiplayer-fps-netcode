@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: e44fc97440f45e946a0bdbdd460acfb9
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Prefabs/VFX/VFX_HealthPickup.prefab
+  uploadId: 627568

@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: b64143a9f71422840b5b9e222f8fff5a
+DefaultImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Prefabs/RootObjects/Wall_Door.mtl
+  uploadId: 627568

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 22f11abeab840ed4c95b6e653f74f8ee
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Art/Materials/Weapons/WeaponLauncher.mat
+  uploadId: 627568

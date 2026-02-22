@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: fe0bc5bbccc19ef47a15b81c0abbb779
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Prefabs/Pickups/Pickup_Blaster.prefab
+  uploadId: 627568

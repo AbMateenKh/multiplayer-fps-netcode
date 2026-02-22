@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: e3a6816b03ceb084b837f8669a888407
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Prefabs/Level/Steps/HighStep.prefab
+  uploadId: 627568

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 77cdde24ac2e841e8b74f2789993afd5
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Tutorials/AddARoom/019-Select-NavMesh.asset
+  uploadId: 627568

@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: cf7e257d2b255a84499370f200689835
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Prefabs/Cube.prefab
+  uploadId: 627568

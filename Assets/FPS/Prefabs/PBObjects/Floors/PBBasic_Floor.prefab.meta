@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 355094681dd488e4bb13ff49bbcee919
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Prefabs/PBObjects/Floors/PBBasic_Floor.prefab
+  uploadId: 627568

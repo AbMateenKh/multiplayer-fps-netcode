@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 5e8e145d9b9fbd94da86fdb8ed2c0cb1
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Prefabs/Level/Steps/ShortSteps_Corner.prefab
+  uploadId: 627568

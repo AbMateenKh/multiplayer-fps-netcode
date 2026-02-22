@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 75bc57e6a3cbdf24fabc12b67cc778e6
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Prefabs/Level/Rooms/Room_Small_T.prefab
+  uploadId: 627568

@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: b99385add00dc1b41b58bf5cd9bafd5c
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Prefabs/Level/Stairwell/Stairwell_Large.prefab
+  uploadId: 627568

@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 154bfb4989fe16d439e8f3fb7c20b72b
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Prefabs/Projectiles/Projectile_Turret.prefab
+  uploadId: 627568

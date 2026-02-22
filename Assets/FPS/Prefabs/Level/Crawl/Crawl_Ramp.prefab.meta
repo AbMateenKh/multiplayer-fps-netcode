@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: bf72addb49312404c8892098d8d911ad
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Prefabs/Level/Crawl/Crawl_Ramp.prefab
+  uploadId: 627568

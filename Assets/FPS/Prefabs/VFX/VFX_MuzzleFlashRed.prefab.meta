@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 3f5b545b9a1e74c418b061bba5bb9e2c
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Prefabs/VFX/VFX_MuzzleFlashRed.prefab
+  uploadId: 627568

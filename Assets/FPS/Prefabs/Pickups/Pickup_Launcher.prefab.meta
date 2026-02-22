@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: a7fa348d53593bb42922672c6cf40651
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Prefabs/Pickups/Pickup_Launcher.prefab
+  uploadId: 627568

@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: bd05a56a26480e646a63a781f822fc20
+AssemblyDefinitionImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Scripts/Editor/fps.Editor.asmdef
+  uploadId: 627568

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 0a6c7076c7acf404bb939f4e7e80d646
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Tutorials/AddARoom/071-Select-Object.asset
+  uploadId: 627568

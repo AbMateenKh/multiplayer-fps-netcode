@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 447dce88648314d409d2faa0d1d852e3
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Tutorials/EditColors/02-Select-and-Frame - delete.asset
+  uploadId: 627568

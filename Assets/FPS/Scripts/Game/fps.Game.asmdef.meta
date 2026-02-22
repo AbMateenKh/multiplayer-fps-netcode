@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 9c5543eabb73a6249ac07b2c065ee8b4
+AssemblyDefinitionImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Scripts/Game/fps.Game.asmdef
+  uploadId: 627568

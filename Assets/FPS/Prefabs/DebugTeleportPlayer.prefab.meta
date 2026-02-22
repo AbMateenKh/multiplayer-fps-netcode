@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: fe7e09d3ff741dc4285ddf0ed3ef03ac
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Prefabs/DebugTeleportPlayer.prefab
+  uploadId: 627568

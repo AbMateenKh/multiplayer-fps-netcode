@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: f803fb494aa6d4a9c84a6c9a07569d6a
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Tutorials/AddARoom/072-Frame-Object.asset
+  uploadId: 627568

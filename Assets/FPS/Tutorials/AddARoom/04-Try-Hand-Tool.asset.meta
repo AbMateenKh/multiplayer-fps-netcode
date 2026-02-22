@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 08664b222211f4218bcf3356bf7bae3e
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Tutorials/AddARoom/04-Try-Hand-Tool.asset
+  uploadId: 627568

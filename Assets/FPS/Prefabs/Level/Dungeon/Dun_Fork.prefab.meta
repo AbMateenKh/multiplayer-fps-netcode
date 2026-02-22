@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 0a5a49e8197f8d34e90e825e26c9ecb2
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Prefabs/Level/Dungeon/Dun_Fork.prefab
+  uploadId: 627568

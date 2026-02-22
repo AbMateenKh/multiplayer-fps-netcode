@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 976e6d34f891e38488eb8ed8a2290007
+TextScriptImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Prefabs/Level/BaseObjects/_ReadMe_BaseObjects.txt
+  uploadId: 627568

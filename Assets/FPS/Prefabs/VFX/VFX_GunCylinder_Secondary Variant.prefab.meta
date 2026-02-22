@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 40252b3901782c347a990f90ce729706
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Prefabs/VFX/VFX_GunCylinder_Secondary Variant.prefab
+  uploadId: 627568

@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 04df6363b21362a46bcfbb6b371a8671
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/ModAssets/Prefabs/Totems/Statue_Big.prefab
+  uploadId: 627568

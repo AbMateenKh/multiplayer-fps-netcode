@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 5a9e1fa835b74524d8b11a37a9900a64
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Prefabs/Level/Steps/ShortSteps.prefab
+  uploadId: 627568

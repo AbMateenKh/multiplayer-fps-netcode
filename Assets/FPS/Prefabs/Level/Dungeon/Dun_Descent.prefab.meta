@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 91e047326c7121248bcdf81ab6f4a6fa
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Prefabs/Level/Dungeon/Dun_Descent.prefab
+  uploadId: 627568

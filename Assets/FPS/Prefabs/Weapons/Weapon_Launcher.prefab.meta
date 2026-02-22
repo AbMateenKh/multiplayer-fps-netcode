@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 3439b4874b7b44e4eb2216314c46b85c
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Prefabs/Weapons/Weapon_Launcher.prefab
+  uploadId: 627568

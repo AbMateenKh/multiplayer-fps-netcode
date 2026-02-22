@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: aa08b41b35f44f14b88700116e6ecff3
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Prefabs/Level/Signs/Sign_Pyramid_Orange.prefab
+  uploadId: 627568

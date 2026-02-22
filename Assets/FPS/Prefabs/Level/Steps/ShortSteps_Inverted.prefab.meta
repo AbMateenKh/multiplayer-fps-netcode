@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: ed3df5433ae26c54e957a9626daf8332
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Prefabs/Level/Steps/ShortSteps_Inverted.prefab
+  uploadId: 627568

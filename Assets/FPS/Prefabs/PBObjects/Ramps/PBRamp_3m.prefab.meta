@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: ad782b64af8253a4d93ead7507322ce2
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Prefabs/PBObjects/Ramps/PBRamp_3m.prefab
+  uploadId: 627568

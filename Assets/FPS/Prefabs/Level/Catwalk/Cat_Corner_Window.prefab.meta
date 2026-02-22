@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 67dfe562c6d5b5f489cf79d46f97f6d1
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Prefabs/Level/Catwalk/Cat_Corner_Window.prefab
+  uploadId: 627568

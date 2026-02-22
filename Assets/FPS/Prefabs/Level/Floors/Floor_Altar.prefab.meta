@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: ff2889050d7d4414f98bf7a5cb0e54d7
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Prefabs/Level/Floors/Floor_Altar.prefab
+  uploadId: 627568

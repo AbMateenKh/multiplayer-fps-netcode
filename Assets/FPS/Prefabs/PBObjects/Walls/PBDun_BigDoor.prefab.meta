@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: f9c6acb4512286140ba3d80a15b53cc9
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Prefabs/PBObjects/Walls/PBDun_BigDoor.prefab
+  uploadId: 627568

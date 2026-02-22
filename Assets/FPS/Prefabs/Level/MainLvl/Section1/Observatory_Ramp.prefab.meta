@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: cf150224d27671b43b579910ad5ce98c
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Prefabs/Level/MainLvl/Section1/Observatory_Ramp.prefab
+  uploadId: 627568

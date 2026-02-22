@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: bee7071e13881aa42803589be7b78c73
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Prefabs/Level/Signs/Sign_Pyramid_Green.prefab
+  uploadId: 627568

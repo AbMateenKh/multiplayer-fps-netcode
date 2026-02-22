@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 0dc14045fb36344f4bf9f8e3a8d37ffe
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Tutorials/AddEnemyBot/005.asset
+  uploadId: 627568

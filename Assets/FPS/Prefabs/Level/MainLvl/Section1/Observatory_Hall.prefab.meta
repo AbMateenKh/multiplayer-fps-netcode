@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: a3c82ee5effb7634f949be4798cda766
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 156015
+  packageName: Unity Learn | FPS Microgame | URP
+  packageVersion: 3.1.0
+  assetPath: Assets/FPS/Prefabs/Level/MainLvl/Section1/Observatory_Hall.prefab
+  uploadId: 627568
