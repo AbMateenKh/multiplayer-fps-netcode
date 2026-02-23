@@ -18,20 +18,22 @@ namespace Unity.FPS.UI
 
         void Start()
         {
-            m_PlayerWeaponsManager = FindObjectOfType<PlayerWeaponsManager>();
-            DebugUtility.HandleErrorIfNullFindObject<PlayerWeaponsManager, WeaponHUDManager>(m_PlayerWeaponsManager,
-                this);
+            //TODO MULTIPLAYER CONVERSION: This will need to be changed to get the local player character controller instead of just finding one in the scene
 
-            WeaponController activeWeapon = m_PlayerWeaponsManager.GetActiveWeapon();
-            if (activeWeapon)
-            {
-                AddWeapon(activeWeapon, m_PlayerWeaponsManager.ActiveWeaponIndex);
-                ChangeWeapon(activeWeapon);
-            }
+            //m_PlayerWeaponsManager = FindObjectOfType<PlayerWeaponsManager>();
+            //DebugUtility.HandleErrorIfNullFindObject<PlayerWeaponsManager, WeaponHUDManager>(m_PlayerWeaponsManager,
+            //    this);
 
-            m_PlayerWeaponsManager.OnAddedWeapon += AddWeapon;
-            m_PlayerWeaponsManager.OnRemovedWeapon += RemoveWeapon;
-            m_PlayerWeaponsManager.OnSwitchedToWeapon += ChangeWeapon;
+            //WeaponController activeWeapon = m_PlayerWeaponsManager.GetActiveWeapon();
+            //if (activeWeapon)
+            //{
+            //    AddWeapon(activeWeapon, m_PlayerWeaponsManager.ActiveWeaponIndex);
+            //    ChangeWeapon(activeWeapon);
+            //}
+
+            //m_PlayerWeaponsManager.OnAddedWeapon += AddWeapon;
+            //m_PlayerWeaponsManager.OnRemovedWeapon += RemoveWeapon;
+            //m_PlayerWeaponsManager.OnSwitchedToWeapon += ChangeWeapon;
         }
 
         void AddWeapon(WeaponController newWeapon, int weaponIndex)

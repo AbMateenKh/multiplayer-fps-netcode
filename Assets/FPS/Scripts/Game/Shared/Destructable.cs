@@ -8,12 +8,14 @@ namespace Unity.FPS.Game
 
         void Start()
         {
-            m_Health = GetComponent<Health>();
-            DebugUtility.HandleErrorIfNullGetComponent<Health, Destructable>(m_Health, this, gameObject);
+            //TODO MULTIPLAYER CONVERSION: This will need to be changed to get the local player character controller instead of just finding one in the scene
 
-            // Subscribe to damage & death actions
-            m_Health.OnDie += OnDie;
-            m_Health.OnDamaged += OnDamaged;
+            //m_Health = GetComponent<Health>();
+            //DebugUtility.HandleErrorIfNullGetComponent<Health, Destructable>(m_Health, this, gameObject);
+
+            //// Subscribe to damage & death actions
+            //m_Health.OnDie += OnDie;
+            //m_Health.OnDamaged += OnDamaged;
         }
 
         void OnDamaged(float damage, GameObject damageSource)

@@ -35,29 +35,32 @@ namespace Unity.FPS.UI
 
         void Start()
         {
-            m_PlayerInputsHandler = FindObjectOfType<PlayerInputHandler>();
-            DebugUtility.HandleErrorIfNullFindObject<PlayerInputHandler, InGameMenuManager>(m_PlayerInputsHandler,
-                this);
+            //TODO MULTIPLAYER CONVERSION: This will need to be changed to get the local player character controller instead of just finding one in the scene
 
-            m_PlayerHealth = m_PlayerInputsHandler.GetComponent<Health>();
-            DebugUtility.HandleErrorIfNullGetComponent<Health, InGameMenuManager>(m_PlayerHealth, this, gameObject);
 
-            m_FramerateCounter = FindObjectOfType<FramerateCounter>();
-            DebugUtility.HandleErrorIfNullFindObject<FramerateCounter, InGameMenuManager>(m_FramerateCounter, this);
+            //m_PlayerInputsHandler = FindObjectOfType<PlayerInputHandler>();
+            //DebugUtility.HandleErrorIfNullFindObject<PlayerInputHandler, InGameMenuManager>(m_PlayerInputsHandler,
+            //    this);
 
-            MenuRoot.SetActive(false);
+            //m_PlayerHealth = m_PlayerInputsHandler.GetComponent<Health>();
+            //DebugUtility.HandleErrorIfNullGetComponent<Health, InGameMenuManager>(m_PlayerHealth, this, gameObject);
 
-            LookSensitivitySlider.value = m_PlayerInputsHandler.LookSensitivity;
-            LookSensitivitySlider.onValueChanged.AddListener(OnMouseSensitivityChanged);
+            //m_FramerateCounter = FindObjectOfType<FramerateCounter>();
+            //DebugUtility.HandleErrorIfNullFindObject<FramerateCounter, InGameMenuManager>(m_FramerateCounter, this);
 
-            ShadowsToggle.isOn = QualitySettings.shadows != ShadowQuality.Disable;
-            ShadowsToggle.onValueChanged.AddListener(OnShadowsChanged);
+            //MenuRoot.SetActive(false);
 
-            InvincibilityToggle.isOn = m_PlayerHealth.Invincible;
-            InvincibilityToggle.onValueChanged.AddListener(OnInvincibilityChanged);
+            //LookSensitivitySlider.value = m_PlayerInputsHandler.LookSensitivity;
+            //LookSensitivitySlider.onValueChanged.AddListener(OnMouseSensitivityChanged);
 
-            FramerateToggle.isOn = m_FramerateCounter.UIText.gameObject.activeSelf;
-            FramerateToggle.onValueChanged.AddListener(OnFramerateCounterChanged);
+            //ShadowsToggle.isOn = QualitySettings.shadows != ShadowQuality.Disable;
+            //ShadowsToggle.onValueChanged.AddListener(OnShadowsChanged);
+
+            //InvincibilityToggle.isOn = m_PlayerHealth.Invincible;
+            //InvincibilityToggle.onValueChanged.AddListener(OnInvincibilityChanged);
+
+            //FramerateToggle.isOn = m_FramerateCounter.UIText.gameObject.activeSelf;
+            //FramerateToggle.onValueChanged.AddListener(OnFramerateCounterChanged);
         }
 
         void Update()

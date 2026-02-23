@@ -10,21 +10,23 @@ namespace Unity.FPS.AI
 
         void Start()
         {
-            ActorsManager actorsManager = FindObjectOfType<ActorsManager>();
-            if (actorsManager != null)
-                m_PlayerTransform = actorsManager.Player.transform;
-            else
-            {
-                enabled = false;
-                return;
-            }
+            //TODO MULTIPLAYER CONVERSION: This will need to be changed to get the local player character controller instead of just finding one in the scene
 
-            m_OriginalOffset = transform.position - m_PlayerTransform.position;
+            //ActorsManager actorsManager = FindObjectOfType<ActorsManager>();
+            //if (actorsManager != null)
+            //    m_PlayerTransform = actorsManager.Player.transform;
+            //else
+            //{
+            //    enabled = false;
+            //    return;
+            //}
+
+            //m_OriginalOffset = transform.position - m_PlayerTransform.position;
         }
 
         void LateUpdate()
         {
-            transform.position = m_PlayerTransform.position + m_OriginalOffset;
+            //transform.position = m_PlayerTransform.position + m_OriginalOffset;
         }
     }
 }

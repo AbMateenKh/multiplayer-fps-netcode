@@ -47,24 +47,28 @@ namespace Unity.FPS.UI
 
         void Start()
         {
+            //TODO MULTIPLAYER CONVERSION: This will need to be changed to get the local player character controller instead of just finding one in the scene
+
             // Subscribe to player damage events
-            PlayerCharacterController playerCharacterController = FindObjectOfType<PlayerCharacterController>();
-            DebugUtility.HandleErrorIfNullFindObject<PlayerCharacterController, FeedbackFlashHUD>(
-                playerCharacterController, this);
+            //PlayerCharacterController playerCharacterController = FindObjectOfType<PlayerCharacterController>();
+            //DebugUtility.HandleErrorIfNullFindObject<PlayerCharacterController, FeedbackFlashHUD>(
+            //    playerCharacterController, this);
 
-            m_PlayerHealth = playerCharacterController.GetComponent<Health>();
-            DebugUtility.HandleErrorIfNullGetComponent<Health, FeedbackFlashHUD>(m_PlayerHealth, this,
-                playerCharacterController.gameObject);
+            //m_PlayerHealth = playerCharacterController.GetComponent<Health>();
+            //DebugUtility.HandleErrorIfNullGetComponent<Health, FeedbackFlashHUD>(m_PlayerHealth, this,
+            //    playerCharacterController.gameObject);
 
-            m_GameFlowManager = FindObjectOfType<GameFlowManager>();
-            DebugUtility.HandleErrorIfNullFindObject<GameFlowManager, FeedbackFlashHUD>(m_GameFlowManager, this);
+            //m_GameFlowManager = FindObjectOfType<GameFlowManager>();
+            //DebugUtility.HandleErrorIfNullFindObject<GameFlowManager, FeedbackFlashHUD>(m_GameFlowManager, this);
 
-            m_PlayerHealth.OnDamaged += OnTakeDamage;
-            m_PlayerHealth.OnHealed += OnHealed;
+            //m_PlayerHealth.OnDamaged += OnTakeDamage;
+            //m_PlayerHealth.OnHealed += OnHealed;
         }
 
         void Update()
         {
+            if (m_PlayerHealth == null) return;
+
             if (m_PlayerHealth.IsCritical())
             {
                 VignetteCanvasGroup.gameObject.SetActive(true);

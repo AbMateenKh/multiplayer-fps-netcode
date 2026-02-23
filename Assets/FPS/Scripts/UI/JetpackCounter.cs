@@ -20,21 +20,23 @@ namespace Unity.FPS.UI
 
         void Awake()
         {
-            m_Jetpack = FindObjectOfType<Jetpack>();
-            DebugUtility.HandleErrorIfNullFindObject<Jetpack, JetpackCounter>(m_Jetpack, this);
+            //TODO MULTIPLAYER CONVERSION: This will need to be changed to get the local player character controller instead of just finding one in the scene
 
-            FillBarColorChange.Initialize(1f, 0f);
+            //m_Jetpack = FindObjectOfType<Jetpack>();
+            //DebugUtility.HandleErrorIfNullFindObject<Jetpack, JetpackCounter>(m_Jetpack, this);
+
+            //FillBarColorChange.Initialize(1f, 0f);
         }
 
         void Update()
         {
-            MainCanvasGroup.gameObject.SetActive(m_Jetpack.IsJetpackUnlocked);
+            //MainCanvasGroup.gameObject.SetActive(m_Jetpack.IsJetpackUnlocked);
 
-            if (m_Jetpack.IsJetpackUnlocked)
-            {
-                JetpackFillImage.fillAmount = m_Jetpack.CurrentFillRatio;
-                FillBarColorChange.UpdateVisual(m_Jetpack.CurrentFillRatio);
-            }
+            //if (m_Jetpack.IsJetpackUnlocked)
+            //{
+            //    JetpackFillImage.fillAmount = m_Jetpack.CurrentFillRatio;
+            //    FillBarColorChange.UpdateVisual(m_Jetpack.CurrentFillRatio);
+            //}
         }
     }
 }

@@ -19,6 +19,8 @@ namespace Unity.FPS.UI
 
         void Update()
         {
+            return; //TODO MULTIPLAYER CONVERSION: This will need to be changed to get the local player character controller instead of just finding one in the scene
+
             // update health bar value
             HealthBarImage.fillAmount = Health.CurrentHealth / Health.MaxHealth;
 

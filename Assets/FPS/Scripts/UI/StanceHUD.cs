@@ -18,11 +18,13 @@ namespace Unity.FPS.UI
 
         void Start()
         {
-            PlayerCharacterController character = FindObjectOfType<PlayerCharacterController>();
-            DebugUtility.HandleErrorIfNullFindObject<PlayerCharacterController, StanceHUD>(character, this);
-            character.OnStanceChanged += OnStanceChanged;
+            //TODO MULTIPLAYER CONVERSION: This will need to be changed to get the local player character controller instead of just finding one in the scene
 
-            OnStanceChanged(character.IsCrouching);
+           // PlayerCharacterController character = FindObjectOfType<PlayerCharacterController>();
+           // DebugUtility.HandleErrorIfNullFindObject<PlayerCharacterController, StanceHUD>(character, this);
+           // character.OnStanceChanged += OnStanceChanged;
+
+            //OnStanceChanged(character.IsCrouching);
         }
 
         void OnStanceChanged(bool crouched)

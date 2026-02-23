@@ -241,13 +241,14 @@ namespace Unity.FPS.EditorExt
 
                 if (!willBeCombined)
                 {
-                    if (!(mf.GetComponentInParent<PlayerCharacterController>() ||
-                          mf.GetComponentInParent<EnemyController>() ||
-                          mf.GetComponentInParent<Pickup>() ||
-                          mf.GetComponentInParent<Objective>()))
-                    {
+                    //TODO MULTIPLAYER CONVERSION: This will need to be changed to get the local player character controller instead of just finding one in the scene
+                    //if (!(mf.GetComponentInParent<PlayerCharacterController>() ||
+                    //      mf.GetComponentInParent<EnemyController>() ||
+                    //      mf.GetComponentInParent<Pickup>() ||
+                    //      mf.GetComponentInParent<Objective>()))
+                   // {
                         nonCombinedMeshCount++;
-                    }
+                   // }
                 }
             }
 

@@ -61,6 +61,9 @@ namespace Unity.FPS.AI
 
         void Update()
         {
+            return; //TODO MULTIPLAYER CONVERSION: This will need to be changed to get the local player character controller instead of just finding one in the scene
+
+
             UpdateAiStateTransitions();
             UpdateCurrentAiState();
 

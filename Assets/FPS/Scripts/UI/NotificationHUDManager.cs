@@ -14,14 +14,16 @@ namespace Unity.FPS.UI
 
         void Awake()
         {
-            PlayerWeaponsManager playerWeaponsManager = FindObjectOfType<PlayerWeaponsManager>();
-            DebugUtility.HandleErrorIfNullFindObject<PlayerWeaponsManager, NotificationHUDManager>(playerWeaponsManager,
-                this);
-            playerWeaponsManager.OnAddedWeapon += OnPickupWeapon;
+            //TODO MULTIPLAYER CONVERSION: This will need to be changed to get the local player character controller instead of just finding one in the scene
 
-            Jetpack jetpack = FindObjectOfType<Jetpack>();
-            DebugUtility.HandleErrorIfNullFindObject<Jetpack, NotificationHUDManager>(jetpack, this);
-            jetpack.OnUnlockJetpack += OnUnlockJetpack;
+            //PlayerWeaponsManager playerWeaponsManager = FindObjectOfType<PlayerWeaponsManager>();
+            //DebugUtility.HandleErrorIfNullFindObject<PlayerWeaponsManager, NotificationHUDManager>(playerWeaponsManager,
+            //    this);
+            //playerWeaponsManager.OnAddedWeapon += OnPickupWeapon;
+
+            //Jetpack jetpack = FindObjectOfType<Jetpack>();
+            //DebugUtility.HandleErrorIfNullFindObject<Jetpack, NotificationHUDManager>(jetpack, this);
+            //jetpack.OnUnlockJetpack += OnUnlockJetpack;
 
             EventManager.AddListener<ObjectiveUpdateEvent>(OnObjectiveUpdateEvent);
         }

@@ -20,18 +20,22 @@ namespace Unity.FPS.UI
 
         void Start()
         {
-            m_WeaponsManager = GameObject.FindObjectOfType<PlayerWeaponsManager>();
-            DebugUtility.HandleErrorIfNullFindObject<PlayerWeaponsManager, CrosshairManager>(m_WeaponsManager, this);
+            //TODO MULTIPLAYER CONVERSION: This will need to be changed to get the local player character controller instead of just finding one in the scene
 
-            OnWeaponChanged(m_WeaponsManager.GetActiveWeapon());
+            //m_WeaponsManager = GameObject.FindObjectOfType<PlayerWeaponsManager>();
+            //DebugUtility.HandleErrorIfNullFindObject<PlayerWeaponsManager, CrosshairManager>(m_WeaponsManager, this);
 
-            m_WeaponsManager.OnSwitchedToWeapon += OnWeaponChanged;
+            //OnWeaponChanged(m_WeaponsManager.GetActiveWeapon());
+
+            //m_WeaponsManager.OnSwitchedToWeapon += OnWeaponChanged;
         }
 
         void Update()
         {
-            UpdateCrosshairPointingAtEnemy(false);
-            m_WasPointingAtEnemy = m_WeaponsManager.IsPointingAtEnemy;
+
+            //TODO MULTIPLAYER CONVERSION: This will need to be changed to get the local player character controller instead of just finding one in the scene
+            // UpdateCrosshairPointingAtEnemy(false);
+            // m_WasPointingAtEnemy = m_WeaponsManager.IsPointingAtEnemy;
         }
 
         void UpdateCrosshairPointingAtEnemy(bool force)

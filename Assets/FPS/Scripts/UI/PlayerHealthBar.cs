@@ -14,20 +14,22 @@ namespace Unity.FPS.UI
 
         void Start()
         {
-            PlayerCharacterController playerCharacterController =
-                GameObject.FindObjectOfType<PlayerCharacterController>();
-            DebugUtility.HandleErrorIfNullFindObject<PlayerCharacterController, PlayerHealthBar>(
-                playerCharacterController, this);
+            //TODO MULTIPLAYER CONVERSION: This will need to be changed to get the local player character controller instead of just finding one in the scene
 
-            m_PlayerHealth = playerCharacterController.GetComponent<Health>();
-            DebugUtility.HandleErrorIfNullGetComponent<Health, PlayerHealthBar>(m_PlayerHealth, this,
-                playerCharacterController.gameObject);
+            //PlayerCharacterController playerCharacterController =
+            //    GameObject.FindObjectOfType<PlayerCharacterController>();
+            //DebugUtility.HandleErrorIfNullFindObject<PlayerCharacterController, PlayerHealthBar>(
+            //    playerCharacterController, this);
+
+            //m_PlayerHealth = playerCharacterController.GetComponent<Health>();
+           // DebugUtility.HandleErrorIfNullGetComponent<Health, PlayerHealthBar>(m_PlayerHealth, this,
+             //   playerCharacterController.gameObject);
         }
 
         void Update()
         {
             // update health bar value
-            HealthFillImage.fillAmount = m_PlayerHealth.CurrentHealth / m_PlayerHealth.MaxHealth;
+            ///HealthFillImage.fillAmount = m_PlayerHealth.CurrentHealth / m_PlayerHealth.MaxHealth;
         }
     }
 }

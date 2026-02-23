@@ -16,14 +16,16 @@ namespace Unity.FPS.Game
 
         void Start()
         {
-            m_ActorsManager = GameObject.FindObjectOfType<ActorsManager>();
-            DebugUtility.HandleErrorIfNullFindObject<ActorsManager, Actor>(m_ActorsManager, this);
+            //TODO MULTIPLAYER CONVERSION: This will need to be changed to get the local player character controller instead of just finding one in the scene
 
-            // Register as an actor
-            if (!m_ActorsManager.Actors.Contains(this))
-            {
-                m_ActorsManager.Actors.Add(this);
-            }
+            //m_ActorsManager = GameObject.FindObjectOfType<ActorsManager>();
+            //DebugUtility.HandleErrorIfNullFindObject<ActorsManager, Actor>(m_ActorsManager, this);
+
+            //// Register as an actor
+            //if (!m_ActorsManager.Actors.Contains(this))
+            //{
+            //    m_ActorsManager.Actors.Add(this);
+            //}
         }
 
         void OnDestroy()

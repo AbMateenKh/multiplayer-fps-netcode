@@ -120,6 +120,8 @@ namespace Unity.FPS.AI
 
         void Start()
         {
+            return; //TODO MULTIPLAYER CONVERSION: This will need to be changed to get the local player character controller instead of just finding one in the scene
+
             m_EnemyManager = FindObjectOfType<EnemyManager>();
             DebugUtility.HandleErrorIfNullFindObject<EnemyManager, EnemyController>(m_EnemyManager, this);
 
@@ -202,6 +204,8 @@ namespace Unity.FPS.AI
 
         void Update()
         {
+
+            return; //TODO MULTIPLAYER CONVERSION: This will need to be changed to get the local player character controller instead of just finding one in the scene
             EnsureIsWithinLevelBounds();
 
             DetectionModule.HandleTargetDetection(m_Actor, m_SelfColliders);
