@@ -17,12 +17,16 @@ namespace Unity.FPS.UI
         [Tooltip("Whether the health bar is visible when at full health or not")]
         public bool HideFullHealthBar = true;
 
+
+
+
+
         void Update()
         {
-            return; //TODO MULTIPLAYER CONVERSION: This will need to be changed to get the local player character controller instead of just finding one in the scene
+            return;
 
             // update health bar value
-            HealthBarImage.fillAmount = Health.CurrentHealth / Health.MaxHealth;
+            HealthBarImage.fillAmount = Health.CurrentHealth.Value / Health.MaxHealth;
 
             // rotate health bar to face the camera/player
             HealthBarPivot.LookAt(Camera.main.transform.position);

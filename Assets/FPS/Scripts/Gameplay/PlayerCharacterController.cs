@@ -134,6 +134,21 @@ namespace Unity.FPS.Gameplay
         const float k_JumpGroundingPreventionTime = 0.2f;
         const float k_GroundCheckDistanceInAir = 0.07f;
 
+
+        // Static event — any script can subscribe to this
+        public static event System.Action<PlayerCharacterController> OnLocalPlayerSpawned;
+
+
+        public override void OnNetworkSpawn()
+        {
+            if (IsOwner)
+            {
+                // Tell everyone "the local player is ready"
+                OnLocalPlayerSpawned?.Invoke(this);
+            }
+        }
+
+
         void Awake()
         {
             ActorsManager actorsManager = FindObjectOfType<ActorsManager>();

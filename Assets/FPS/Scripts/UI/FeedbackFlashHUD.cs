@@ -1,4 +1,5 @@
-﻿using Unity.FPS.Game;
+﻿using System;
+using Unity.FPS.Game;
 using Unity.FPS.Gameplay;
 using UnityEngine;
 using UnityEngine.UI;
@@ -47,33 +48,39 @@ namespace Unity.FPS.UI
 
         void Start()
         {
+
+            // Subscribe to the event
+            PlayerCharacterController.OnLocalPlayerSpawned += OnLocalPlayerSpawned;
+
+
             //TODO MULTIPLAYER CONVERSION: This will need to be changed to get the local player character controller instead of just finding one in the scene
 
-            // Subscribe to player damage events
+            //// Subscribe to player damage events
             //PlayerCharacterController playerCharacterController = FindObjectOfType<PlayerCharacterController>();
-            //DebugUtility.HandleErrorIfNullFindObject<PlayerCharacterController, FeedbackFlashHUD>(
-            //    playerCharacterController, this);
-
             //m_PlayerHealth = playerCharacterController.GetComponent<Health>();
-            //DebugUtility.HandleErrorIfNullGetComponent<Health, FeedbackFlashHUD>(m_PlayerHealth, this,
-            //    playerCharacterController.gameObject);
-
-            //m_GameFlowManager = FindObjectOfType<GameFlowManager>();
-            //DebugUtility.HandleErrorIfNullFindObject<GameFlowManager, FeedbackFlashHUD>(m_GameFlowManager, this);
-
             //m_PlayerHealth.OnDamaged += OnTakeDamage;
             //m_PlayerHealth.OnHealed += OnHealed;
+            
+            m_GameFlowManager = FindObjectOfType<GameFlowManager>();
+        }
+
+        private void OnLocalPlayerSpawned(PlayerCharacterController controller)
+        {
+            m_PlayerHealth = controller.GetComponent<Health>();
+            m_PlayerHealth.OnDamaged += OnTakeDamage;
+            m_PlayerHealth.OnHealed += OnHealed;
         }
 
         void Update()
         {
-            if (m_PlayerHealth == null) return;
+            if(m_PlayerHealth == null)
+                return;
 
             if (m_PlayerHealth.IsCritical())
             {
                 VignetteCanvasGroup.gameObject.SetActive(true);
                 float vignetteAlpha =
-                    (1 - (m_PlayerHealth.CurrentHealth / m_PlayerHealth.MaxHealth /
+                    (1 - (m_PlayerHealth.CurrentHealth.Value / m_PlayerHealth.MaxHealth /
                           m_PlayerHealth.CriticalHealthRatio)) * CriticaHealthVignetteMaxAlpha;
 
                 if (m_GameFlowManager.GameIsEnding)
