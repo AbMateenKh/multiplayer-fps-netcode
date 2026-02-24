@@ -1,4 +1,5 @@
 ﻿using Unity.FPS.Game;
+using Unity.Netcode;
 using UnityEngine;
 
 namespace Unity.FPS.Gameplay
@@ -24,16 +25,17 @@ namespace Unity.FPS.Gameplay
         PlayerCharacterController m_PlayerCharacterController;
         bool m_FireInputWasHeld;
 
+
+        NetworkBehaviour m_NetworkBehaviour;
+
         void Start()
         {
             m_PlayerCharacterController = GetComponent<PlayerCharacterController>();
-            DebugUtility.HandleErrorIfNullGetComponent<PlayerCharacterController, PlayerInputHandler>(
-                m_PlayerCharacterController, this, gameObject);
             m_GameFlowManager = FindObjectOfType<GameFlowManager>();
-            DebugUtility.HandleErrorIfNullFindObject<GameFlowManager, PlayerInputHandler>(m_GameFlowManager, this);
+            m_NetworkBehaviour = GetComponent<NetworkBehaviour>();
 
-            //Cursor.lockState = CursorLockMode.Locked;
-            //Cursor.visible = false;
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
         }
 
         void LateUpdate()
@@ -43,6 +45,10 @@ namespace Unity.FPS.Gameplay
 
         public bool CanProcessInput()
         {
+            // Added: only process input if we own this player
+            if (m_NetworkBehaviour != null && !m_NetworkBehaviour.IsOwner)
+                return false;
+
             return Cursor.lockState == CursorLockMode.Locked && !m_GameFlowManager.GameIsEnding;
         }
 
