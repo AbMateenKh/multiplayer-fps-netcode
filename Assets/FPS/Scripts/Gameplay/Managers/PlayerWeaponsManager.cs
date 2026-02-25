@@ -1,12 +1,13 @@
 ﻿using System.Collections.Generic;
 using Unity.FPS.Game;
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Events;
 
 namespace Unity.FPS.Gameplay
 {
     [RequireComponent(typeof(PlayerInputHandler))]
-    public class PlayerWeaponsManager : MonoBehaviour
+    public class PlayerWeaponsManager : NetworkBehaviour
     {
         public enum WeaponSwitchState
         {
@@ -80,6 +81,16 @@ namespace Unity.FPS.Gameplay
         public UnityAction<WeaponController, int> OnAddedWeapon;
         public UnityAction<WeaponController, int> OnRemovedWeapon;
 
+
+        // NETWORKED STATE
+        // Everyone needs to see which weapon you hold
+        NetworkVariable<int> m_NetworkActiveWeaponIndex = new NetworkVariable<int>(
+            -1,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Owner
+        );
+
+
         WeaponController[] m_WeaponSlots = new WeaponController[9]; // 9 available weapon slots
         PlayerInputHandler m_InputHandler;
         PlayerCharacterController m_PlayerCharacterController;
@@ -99,13 +110,9 @@ namespace Unity.FPS.Gameplay
             m_WeaponSwitchState = WeaponSwitchState.Down;
 
             m_InputHandler = GetComponent<PlayerInputHandler>();
-            DebugUtility.HandleErrorIfNullGetComponent<PlayerInputHandler, PlayerWeaponsManager>(m_InputHandler, this,
-                gameObject);
-
             m_PlayerCharacterController = GetComponent<PlayerCharacterController>();
-            DebugUtility.HandleErrorIfNullGetComponent<PlayerCharacterController, PlayerWeaponsManager>(
-                m_PlayerCharacterController, this, gameObject);
 
+            if(IsOwner)
             SetFov(DefaultFov);
 
             OnSwitchedToWeapon += OnWeaponSwitched;
@@ -121,6 +128,10 @@ namespace Unity.FPS.Gameplay
 
         void Update()
         {
+
+            if(!IsOwner)
+                return;
+
             // shoot handling
             WeaponController activeWeapon = GetActiveWeapon();
 
@@ -193,6 +204,10 @@ namespace Unity.FPS.Gameplay
         // Update various animated features in LateUpdate because it needs to override the animated arm position
         void LateUpdate()
         {
+
+            if(!IsOwner)
+                return; 
+
             UpdateWeaponAiming();
             UpdateWeaponBob();
             UpdateWeaponRecoil();
@@ -250,6 +265,12 @@ namespace Unity.FPS.Gameplay
                     m_WeaponMainLocalPosition = DownWeaponPosition.localPosition;
                     m_WeaponSwitchState = WeaponSwitchState.PutUpNew;
                     ActiveWeaponIndex = m_WeaponSwitchNewWeaponIndex;
+                    // Sync to network
+                    if (IsOwner)
+                    {
+                        m_NetworkActiveWeaponIndex.Value = ActiveWeaponIndex;
+                    }
+
 
                     WeaponController newWeapon = GetWeaponAtSlotIndex(m_WeaponSwitchNewWeaponIndex);
                     if (OnSwitchedToWeapon != null)
@@ -385,6 +406,14 @@ namespace Unity.FPS.Gameplay
                     }
 
                     ActiveWeaponIndex = m_WeaponSwitchNewWeaponIndex;
+
+                    // Sync to network when switch completes
+                    if (IsOwner)
+                    {
+                        m_NetworkActiveWeaponIndex.Value = ActiveWeaponIndex;
+                    }
+
+
                     switchingTimeFactor = 0f;
 
                     // Activate new weapon

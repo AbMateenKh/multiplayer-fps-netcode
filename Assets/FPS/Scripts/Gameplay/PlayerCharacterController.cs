@@ -6,7 +6,7 @@ using UnityEngine.Events;
 namespace Unity.FPS.Gameplay
 {
     [RequireComponent(typeof(CharacterController), typeof(PlayerInputHandler), typeof(AudioSource))]
-    public class PlayerCharacterController : NetworkBehaviour
+    public class PlayerCharacterController : NetworkBehaviour, INetworkShooter
     {
         [Header("References")] [Tooltip("Reference to the main camera used for the player")]
         public Camera PlayerCamera;
@@ -462,6 +462,34 @@ namespace Unity.FPS.Gameplay
 
             IsCrouching = crouched;
             return true;
+        }
+
+        public void RequestShoot(Vector3 origin, Vector3 direction)
+        {
+            RequestShootServerRpc( origin,  direction);
+        }
+
+        [ServerRpc]
+        void RequestShootServerRpc(Vector3 origin, Vector3 direction)
+        {
+            if (Physics.Raycast(origin, direction, out RaycastHit hit, 1000f, -1,
+                QueryTriggerInteraction.Ignore))
+            {
+                Health targetHealth = hit.collider.GetComponentInParent<Health>();
+                if (targetHealth != null)
+                {
+                    targetHealth.TakeDamage(10f, gameObject);
+                }
+            }
+
+            ShootVisualClientRpc(origin, direction);
+        }
+
+        [ClientRpc]
+        void ShootVisualClientRpc(Vector3 origin, Vector3 direction)
+        {
+            if (IsOwner) return;
+            // Remote shot visuals
         }
     }
 }

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Events;
 
@@ -163,6 +164,10 @@ namespace Unity.FPS.Game
 
         private Queue<Rigidbody> m_PhysicalAmmoPool;
 
+
+        NetworkBehaviour m_OwnerNetworkBehaviour;
+        INetworkShooter m_NetworkShooter;
+
         void Awake()
         {
             m_CurrentAmmo = MaxAmmo;
@@ -192,6 +197,17 @@ namespace Unity.FPS.Game
                     shell.SetActive(false);
                     m_PhysicalAmmoPool.Enqueue(shell.GetComponent<Rigidbody>());
                 }
+            }
+        }
+
+
+        private void Start()
+        {
+            // Cache the owner's NetworkBehaviour for network checks
+            if (Owner != null)
+            {
+                m_OwnerNetworkBehaviour = Owner.GetComponent<NetworkBehaviour>();
+                m_NetworkShooter = Owner.GetComponent<INetworkShooter>();
             }
         }
 
@@ -449,6 +465,11 @@ namespace Unity.FPS.Game
                 ProjectileBase newProjectile = Instantiate(ProjectilePrefab, WeaponMuzzle.position,
                     Quaternion.LookRotation(shotDirection));
                 newProjectile.Shoot(this);
+
+
+                // Uses interface — no reference to fps.Gameplay!
+                m_NetworkShooter?.RequestShoot(
+                    WeaponMuzzle.position, shotDirection);
             }
 
             // muzzle flash

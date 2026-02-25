@@ -7,29 +7,49 @@ namespace Unity.FPS.UI
 {
     public class PlayerHealthBar : MonoBehaviour
     {
-        [Tooltip("Image component dispplaying current health")]
+        [Tooltip("Image component displaying current health")]
         public Image HealthFillImage;
 
         Health m_PlayerHealth;
 
         void Start()
         {
-            //TODO MULTIPLAYER CONVERSION: This will need to be changed to get the local player character controller instead of just finding one in the scene
-
-            //PlayerCharacterController playerCharacterController =
-            //    GameObject.FindObjectOfType<PlayerCharacterController>();
-            //DebugUtility.HandleErrorIfNullFindObject<PlayerCharacterController, PlayerHealthBar>(
-            //    playerCharacterController, this);
-
-            //m_PlayerHealth = playerCharacterController.GetComponent<Health>();
-           // DebugUtility.HandleErrorIfNullGetComponent<Health, PlayerHealthBar>(m_PlayerHealth, this,
-             //   playerCharacterController.gameObject);
+            PlayerCharacterController.OnLocalPlayerSpawned += OnLocalPlayerSpawned;
         }
 
-        void Update()
+        void OnDestroy()
         {
-            // update health bar value
-            ///HealthFillImage.fillAmount = m_PlayerHealth.CurrentHealth / m_PlayerHealth.MaxHealth;
+            PlayerCharacterController.OnLocalPlayerSpawned -= OnLocalPlayerSpawned;
+
+            if (m_PlayerHealth != null)
+            {
+                m_PlayerHealth.CurrentHealth.OnValueChanged -= OnHealthChanged;
+            }
         }
+
+        void OnLocalPlayerSpawned(PlayerCharacterController player)
+        {
+            m_PlayerHealth = player.GetComponent<Health>();
+
+            // Subscribe to NetworkVariable changes instead of polling in Update
+            m_PlayerHealth.CurrentHealth.OnValueChanged += OnHealthChanged;
+
+            // Set initial value
+            UpdateHealthBar();
+        }
+
+        void OnHealthChanged(float previousValue, float newValue)
+        {
+            UpdateHealthBar();
+        }
+
+        void UpdateHealthBar()
+        {
+            if (m_PlayerHealth != null)
+            {
+                HealthFillImage.fillAmount = m_PlayerHealth.GetRatio();
+            }
+        }
+
     }
 }
