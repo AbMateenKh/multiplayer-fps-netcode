@@ -211,6 +211,16 @@ namespace Unity.FPS.Game
             }
         }
 
+
+        // NEW: Called before shooting, ensures reference is cached
+        INetworkShooter GetNetworkShooter()
+        {
+            if (m_NetworkShooter == null && Owner != null)
+            {
+                m_NetworkShooter = Owner.GetComponent<INetworkShooter>();
+            }
+            return m_NetworkShooter;
+        }
         public void AddCarriablePhysicalBullets(int count) => m_CarriedPhysicalBullets = Mathf.Max(m_CarriedPhysicalBullets + count, MaxAmmo);
 
         void ShootShell()
@@ -468,8 +478,8 @@ namespace Unity.FPS.Game
 
 
                 // Uses interface — no reference to fps.Gameplay!
-                m_NetworkShooter?.RequestShoot(
-                    WeaponMuzzle.position, shotDirection);
+                GetNetworkShooter()?.RequestShoot(
+    WeaponMuzzle.position, shotDirection);
             }
 
             // muzzle flash

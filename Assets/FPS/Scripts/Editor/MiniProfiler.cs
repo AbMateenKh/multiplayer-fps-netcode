@@ -267,7 +267,7 @@ namespace Unity.FPS.EditorExt
             }
 
             int lightsCount = GameObject.FindObjectsOfType<Light>().Length;
-            int enemyCount = GameObject.FindObjectsOfType<EnemyController>().Length;
+           // int enemyCount = GameObject.FindObjectsOfType<EnemyController>().Length;
 
             // Level analysis 
             m_LevelAnalysisString += "- Meshes count: " + meshCount;
@@ -280,7 +280,7 @@ namespace Unity.FPS.EditorExt
             m_LevelAnalysisString += k_NewLine;
             m_LevelAnalysisString += "- Lights count: " + lightsCount;
             m_LevelAnalysisString += k_NewLine;
-            m_LevelAnalysisString += "- Enemy count: " + enemyCount;
+           // m_LevelAnalysisString += "- Enemy count: " + enemyCount;
 
             // Suggestions
             if (nonCombinedMeshCount > 50)

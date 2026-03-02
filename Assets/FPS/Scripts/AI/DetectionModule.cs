@@ -39,12 +39,23 @@ namespace Unity.FPS.AI
 
         protected virtual void Start()
         {
-            m_ActorsManager = FindObjectOfType<ActorsManager>();
-            DebugUtility.HandleErrorIfNullFindObject<ActorsManager, DetectionModule>(m_ActorsManager, this);
+            m_ActorsManager = FindFirstObjectByType<ActorsManager>();
+          
         }
 
         public virtual void HandleTargetDetection(Actor actor, Collider[] selfColliders)
         {
+            Debug.Log($"[Detection] Actors count: {m_ActorsManager?.Actors?.Count}");
+            if (m_ActorsManager != null)
+            {
+                foreach (Actor a in m_ActorsManager.Actors)
+                {
+                    Debug.Log($"[Detection] Actor: {a.gameObject.name}, " +
+                              $"Affiliation: {a.Affiliation}, " +
+                              $"MyAffiliation: {actor.Affiliation}");
+                }
+            }
+
             // Handle known target detection timeout
             if (KnownDetectedTarget && !IsSeeingTarget && (Time.time - TimeLastSeenTarget) > KnownTargetTimeout)
             {

@@ -1,10 +1,11 @@
 ﻿using Unity.FPS.Game;
+using Unity.Netcode;
 using UnityEngine;
 
 namespace Unity.FPS.AI
 {
     [RequireComponent(typeof(EnemyController))]
-    public class EnemyTurret : MonoBehaviour
+    public class EnemyTurret : NetworkBehaviour
     {
         public enum AIState
         {
@@ -39,35 +40,45 @@ namespace Unity.FPS.AI
         const string k_AnimOnDamagedParameter = "OnDamaged";
         const string k_AnimIsActiveParameter = "IsActive";
 
-        void Start()
+
+        // NETWORK SPAWN — replaces Start()
+        public override void OnNetworkSpawn()
         {
             m_Health = GetComponent<Health>();
-          
-            m_Health.OnDamaged += OnDamaged;
             m_EnemyController = GetComponent<EnemyController>();
 
+            // ALL CLIENTS: subscribe to damage for visual effects
+            m_Health.OnDamaged += OnDamaged;
 
-            m_EnemyController.onDetectedTarget += OnDetectedTarget;
-            m_EnemyController.onLostTarget += OnLostTarget;
+            // SERVER ONLY: subscribe to detection events for AI logic
+            if (IsServer)
+            {
+                m_EnemyController.onDetectedTarget += OnDetectedTarget;
+                m_EnemyController.onLostTarget += OnLostTarget;
+            }
 
-            // Remember the rotation offset between the pivot's forward and the weapon's forward
             m_RotationWeaponForwardToPivot =
-                Quaternion.Inverse(m_EnemyController.GetCurrentWeapon().WeaponMuzzle.rotation) * TurretPivot.rotation;
+                Quaternion.Inverse(m_EnemyController.GetCurrentWeapon().WeaponMuzzle.rotation)
+                * TurretPivot.rotation;
 
-            // Start with idle
             AiState = AIState.Idle;
-
             m_TimeStartedDetection = Mathf.NegativeInfinity;
             m_PreviousPivotAimingRotation = TurretPivot.rotation;
         }
 
         void Update()
         {
+            if (!IsServer) return;
+
+            Debug.Log($"[Turret] State: {AiState}, " +
+             $"HasTarget: {m_EnemyController.KnownDetectedTarget != null}, " +
+             $"InRange: {m_EnemyController.IsTargetInAttackRange}");
             UpdateCurrentAiState();
         }
 
         void LateUpdate()
         {
+            if (!IsServer) return;
             UpdateTurretAiming();
         }
 
@@ -128,6 +139,8 @@ namespace Unity.FPS.AI
             Animator.SetTrigger(k_AnimOnDamagedParameter);
         }
 
+
+        // DETECTION EVENTS — Server only, notify clients for VFX
         void OnDetectedTarget()
         {
             if (AiState == AIState.Idle)
@@ -135,6 +148,15 @@ namespace Unity.FPS.AI
                 AiState = AIState.Attack;
             }
 
+            m_TimeStartedDetection = Time.time;
+
+            // Tell clients to play detection effects
+            OnDetectedClientRpc();
+        }
+
+        [ClientRpc]
+        void OnDetectedClientRpc()
+        {
             for (int i = 0; i < OnDetectVfx.Length; i++)
             {
                 OnDetectVfx[i].Play();
@@ -142,11 +164,11 @@ namespace Unity.FPS.AI
 
             if (OnDetectSfx)
             {
-                AudioUtility.CreateSFX(OnDetectSfx, transform.position, AudioUtility.AudioGroups.EnemyDetection, 1f);
+                AudioUtility.CreateSFX(OnDetectSfx, transform.position,
+                    AudioUtility.AudioGroups.EnemyDetection, 1f);
             }
 
             Animator.SetBool(k_AnimIsActiveParameter, true);
-            m_TimeStartedDetection = Time.time;
         }
 
         void OnLostTarget()
@@ -156,13 +178,21 @@ namespace Unity.FPS.AI
                 AiState = AIState.Idle;
             }
 
+            m_TimeLostDetection = Time.time;
+
+            // Tell clients to stop detection effects
+            OnLostTargetClientRpc();
+        }
+
+        [ClientRpc]
+        void OnLostTargetClientRpc()
+        {
             for (int i = 0; i < OnDetectVfx.Length; i++)
             {
                 OnDetectVfx[i].Stop();
             }
 
             Animator.SetBool(k_AnimIsActiveParameter, false);
-            m_TimeLostDetection = Time.time;
         }
     }
 }

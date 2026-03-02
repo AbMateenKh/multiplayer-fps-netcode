@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using Unity.FPS.Game;
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.AI;
 using UnityEngine.Events;
@@ -7,7 +8,7 @@ using UnityEngine.Events;
 namespace Unity.FPS.AI
 {
     [RequireComponent(typeof(Health), typeof(Actor), typeof(NavMeshAgent))]
-    public class EnemyController : MonoBehaviour
+    public class EnemyController : NetworkBehaviour, INetworkShooter
     {
         [System.Serializable]
         public struct RendererIndexData
@@ -118,29 +119,35 @@ namespace Unity.FPS.AI
         WeaponController[] m_Weapons;
         NavigationModule m_NavigationModule;
 
-        void Start()
+        public override void OnNetworkSpawn()
         {
+            // ALL CLIENTS: Set enemy team
+            GetComponent<Actor>().Affiliation = 1;
 
-            return;
+            // ALL CLIENTS: Setup visuals
+            SetupRenderers();
+
+            // SERVER ONLY: Setup AI logic
+            if (!IsServer)
+            {
+                // Disable NavMeshAgent on clients — server drives movement
+                NavMeshAgent = GetComponent<NavMeshAgent>();
+                NavMeshAgent.enabled = false;
+                return;
+            }
+
+            // Everything below is SERVER ONLY
             m_EnemyManager = FindObjectOfType<EnemyManager>();
-
             m_ActorsManager = FindObjectOfType<ActorsManager>();
-
             m_EnemyManager.RegisterEnemy(this);
 
             m_Health = GetComponent<Health>();
-     
-
             m_Actor = GetComponent<Actor>();
-            DebugUtility.HandleErrorIfNullGetComponent<Actor, EnemyController>(m_Actor, this, gameObject);
-
             NavMeshAgent = GetComponent<NavMeshAgent>();
             m_SelfColliders = GetComponentsInChildren<Collider>();
-
             m_GameFlowManager = FindObjectOfType<GameFlowManager>();
-            DebugUtility.HandleErrorIfNullFindObject<GameFlowManager, EnemyController>(m_GameFlowManager, this);
 
-            // Subscribe to damage & death actions
+            // Subscribe to damage & death
             m_Health.OnDie += OnDie;
             m_Health.OnDamaged += OnDamaged;
 
@@ -149,21 +156,15 @@ namespace Unity.FPS.AI
             var weapon = GetCurrentWeapon();
             weapon.ShowWeapon(true);
 
-            var detectionModules = GetComponentsInChildren<DetectionModule>();
-            DebugUtility.HandleErrorIfNoComponentFound<DetectionModule, EnemyController>(detectionModules.Length, this,
-                gameObject);
-            DebugUtility.HandleWarningIfDuplicateObjects<DetectionModule, EnemyController>(detectionModules.Length,
-                this, gameObject);
             // Initialize detection module
+            var detectionModules = GetComponentsInChildren<DetectionModule>();
             DetectionModule = detectionModules[0];
             DetectionModule.onDetectedTarget += OnDetectedTarget;
             DetectionModule.onLostTarget += OnLostTarget;
             onAttack += DetectionModule.OnAttack;
 
+            // Navigation module
             var navigationModules = GetComponentsInChildren<NavigationModule>();
-            DebugUtility.HandleWarningIfDuplicateObjects<DetectionModule, EnemyController>(detectionModules.Length,
-                this, gameObject);
-            // Override navmesh agent data
             if (navigationModules.Length > 0)
             {
                 m_NavigationModule = navigationModules[0];
@@ -172,6 +173,13 @@ namespace Unity.FPS.AI
                 NavMeshAgent.acceleration = m_NavigationModule.Acceleration;
             }
 
+        }
+
+
+
+
+        void SetupRenderers()
+        {
             foreach (var renderer in GetComponentsInChildren<Renderer>(true))
             {
                 for (int i = 0; i < renderer.sharedMaterials.Length; i++)
@@ -190,7 +198,6 @@ namespace Unity.FPS.AI
 
             m_BodyFlashMaterialPropertyBlock = new MaterialPropertyBlock();
 
-            // Check if we have an eye renderer for this enemy
             if (m_EyeRendererData.Renderer != null)
             {
                 m_EyeColorMaterialPropertyBlock = new MaterialPropertyBlock();
@@ -200,23 +207,36 @@ namespace Unity.FPS.AI
             }
         }
 
+
+
         void Update()
         {
+            // ALL CLIENTS: Update damage flash visuals
+            UpdateBodyFlash();
 
-            return; //TODO MULTIPLAYER CONVERSION: This will need to be changed to get the local player character controller instead of just finding one in the scene
+            // SERVER ONLY: AI logic
+            if (!IsServer) return;
+
             EnsureIsWithinLevelBounds();
-
             DetectionModule.HandleTargetDetection(m_Actor, m_SelfColliders);
+            m_WasDamagedThisFrame = false;
+        }
 
-            Color currentColor = OnHitBodyGradient.Evaluate((Time.time - m_LastTimeDamaged) / FlashOnHitDuration);
+
+        void UpdateBodyFlash()
+        {
+            if (m_BodyFlashMaterialPropertyBlock == null) return;
+
+            Color currentColor = OnHitBodyGradient.Evaluate(
+                (Time.time - m_LastTimeDamaged) / FlashOnHitDuration);
             m_BodyFlashMaterialPropertyBlock.SetColor("_EmissionColor", currentColor);
             foreach (var data in m_BodyRenderers)
             {
-                data.Renderer.SetPropertyBlock(m_BodyFlashMaterialPropertyBlock, data.MaterialIndex);
+                data.Renderer.SetPropertyBlock(m_BodyFlashMaterialPropertyBlock,
+                    data.MaterialIndex);
             }
-
-            m_WasDamagedThisFrame = false;
         }
+
 
         void EnsureIsWithinLevelBounds()
         {
@@ -231,11 +251,17 @@ namespace Unity.FPS.AI
         void OnLostTarget()
         {
             onLostTarget.Invoke();
+            // Tell clients to update eye color
+            UpdateEyeColorClientRpc(false);
+        }
 
-            // Set the eye attack color and property block if the eye renderer is set
+        [ClientRpc]
+        void UpdateEyeColorClientRpc(bool isAttacking)
+        {
             if (m_EyeRendererData.Renderer != null)
             {
-                m_EyeColorMaterialPropertyBlock.SetColor("_EmissionColor", DefaultEyeColor);
+                m_EyeColorMaterialPropertyBlock.SetColor("_EmissionColor",
+                    isAttacking ? AttackEyeColor : DefaultEyeColor);
                 m_EyeRendererData.Renderer.SetPropertyBlock(m_EyeColorMaterialPropertyBlock,
                     m_EyeRendererData.MaterialIndex);
             }
@@ -245,13 +271,8 @@ namespace Unity.FPS.AI
         {
             onDetectedTarget.Invoke();
 
-            // Set the eye default color and property block if the eye renderer is set
-            if (m_EyeRendererData.Renderer != null)
-            {
-                m_EyeColorMaterialPropertyBlock.SetColor("_EmissionColor", AttackEyeColor);
-                m_EyeRendererData.Renderer.SetPropertyBlock(m_EyeColorMaterialPropertyBlock,
-                    m_EyeRendererData.MaterialIndex);
-            }
+            // Tell clients to update eye color
+            UpdateEyeColorClientRpc(true);
         }
 
         public void OrientTowards(Vector3 lookPosition)
@@ -340,42 +361,78 @@ namespace Unity.FPS.AI
             }
         }
 
+
+        // DAMAGE — Server handles logic, clients see flash
         void OnDamaged(float damage, GameObject damageSource)
         {
-            // test if the damage source is the player
+            // Server only — called from Health which is server-authoritative
             if (damageSource && !damageSource.GetComponent<EnemyController>())
             {
-                // pursue the player
                 DetectionModule.OnDamaged(damageSource);
-                
                 onDamaged?.Invoke();
                 m_LastTimeDamaged = Time.time;
-            
-                // play the damage tick sound
-                if (DamageTick && !m_WasDamagedThisFrame)
-                    AudioUtility.CreateSFX(DamageTick, transform.position, AudioUtility.AudioGroups.DamageTick, 0f);
-            
                 m_WasDamagedThisFrame = true;
+
+                // Tell all clients about the damage (for flash + sound)
+                OnDamagedClientRpc();
             }
         }
 
+        [ClientRpc]
+        void OnDamagedClientRpc()
+        {
+            m_LastTimeDamaged = Time.time;
+
+            if (DamageTick)
+            {
+                AudioUtility.CreateSFX(DamageTick, transform.position,
+                    AudioUtility.AudioGroups.DamageTick, 0f);
+            }
+        }
+
+
+        // DEATH — Server despawns, clients see VFX
         void OnDie()
         {
-            // spawn a particle system when dying
-            var vfx = Instantiate(DeathVfx, DeathVfxSpawnPoint.position, Quaternion.identity);
-            Destroy(vfx, 5f);
-
-            // tells the game flow manager to handle the enemy destuction
+            // Server only
             m_EnemyManager.UnregisterEnemy(this);
 
-            // loot an object
+            // Tell clients to play death VFX
+            OnDeathClientRpc();
+
+            // Loot — server spawns loot (local for now, network later if needed)
             if (TryDropItem())
             {
                 Instantiate(LootPrefab, transform.position, Quaternion.identity);
             }
 
-            // this will call the OnDestroy function
-            Destroy(gameObject, DeathDuration);
+            // Despawn the networked enemy after death duration
+            // NetworkObject.Despawn() replaces Destroy() for networked objects
+            if (DeathDuration > 0)
+            {
+                Invoke(nameof(DespawnEnemy), DeathDuration);
+            }
+            else
+            {
+                DespawnEnemy();
+            }
+        }
+
+
+        void DespawnEnemy()
+        {
+            NetworkObject.Despawn(true); // true = destroy the GameObject
+        }
+
+        [ClientRpc]
+        void OnDeathClientRpc()
+        {
+            if (DeathVfx && DeathVfxSpawnPoint)
+            {
+                var vfx = Instantiate(DeathVfx, DeathVfxSpawnPoint.position,
+                    Quaternion.identity);
+                Destroy(vfx, 5f);
+            }
         }
 
         void OnDrawGizmosSelected()
@@ -486,6 +543,32 @@ namespace Unity.FPS.AI
             else
             {
                 m_LastTimeWeaponSwapped = Mathf.NegativeInfinity;
+            }
+        }
+
+        public void RequestShoot(Vector3 origin, Vector3 direction)
+        {
+            Debug.Log($"[Enemy] RequestShoot from {origin}, dir {direction}");
+
+            if (Physics.Raycast(origin, direction, out RaycastHit hit, 1000f, -1,
+                QueryTriggerInteraction.Ignore))
+            {
+                Debug.Log($"[Enemy] Hit: {hit.collider.gameObject.name}");
+
+                Health targetHealth = hit.collider.GetComponentInParent<Health>();
+                if (targetHealth != null)
+                {
+                    Debug.Log($"[Enemy] Dealing damage to {targetHealth.gameObject.name}");
+                    targetHealth.TakeDamage(10f, gameObject);
+                }
+                else
+                {
+                    Debug.Log($"[Enemy] No Health component on {hit.collider.gameObject.name}");
+                }
+            }
+            else
+            {
+                Debug.Log($"[Enemy] Raycast missed everything");
             }
         }
     }

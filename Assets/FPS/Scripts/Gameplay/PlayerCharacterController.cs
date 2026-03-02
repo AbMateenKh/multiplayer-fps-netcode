@@ -146,15 +146,22 @@ namespace Unity.FPS.Gameplay
                 // Tell everyone "the local player is ready"
                 OnLocalPlayerSpawned?.Invoke(this);
             }
+
+            // Register this player as an actor on ALL clients
+            // Must happen here because player spawns after scene enemies
+            Actor actor = GetComponent<Actor>();
+            ActorsManager actorsManager = FindFirstObjectByType<ActorsManager>();
+            if (actorsManager != null && actor != null
+                && !actorsManager.Actors.Contains(actor))
+            {
+                actor.Affiliation = 0; // Player team
+                actorsManager.Actors.Add(actor);
+                Debug.Log($"[Player] Registered as actor. Total: {actorsManager.Actors.Count}");
+            }
         }
 
 
-        void Awake()
-        {
-            ActorsManager actorsManager = FindObjectOfType<ActorsManager>();
-            if (actorsManager != null)
-                actorsManager.SetPlayer(gameObject);
-        }
+      
 
         void Start()
         {

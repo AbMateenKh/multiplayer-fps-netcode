@@ -1,10 +1,12 @@
 ﻿using Unity.FPS.Game;
+using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.AI;
 
 namespace Unity.FPS.AI
 {
     [RequireComponent(typeof(EnemyController))]
-    public class EnemyMobile : MonoBehaviour
+    public class EnemyMobile : NetworkBehaviour
     {
         public enum AIState
         {
@@ -36,45 +38,58 @@ namespace Unity.FPS.AI
         const string k_AnimAttackParameter = "Attack";
         const string k_AnimAlertedParameter = "Alerted";
         const string k_AnimOnDamagedParameter = "OnDamaged";
+        NavMeshAgent m_NavMeshAgent;
 
-        void Start()
+        // NETWORK SPAWN — replaces Start()
+        public override void OnNetworkSpawn()
         {
             m_EnemyController = GetComponent<EnemyController>();
-            DebugUtility.HandleErrorIfNullGetComponent<EnemyController, EnemyMobile>(m_EnemyController, this,
-                gameObject);
-
-            m_EnemyController.onAttack += OnAttack;
-            m_EnemyController.onDetectedTarget += OnDetectedTarget;
-            m_EnemyController.onLostTarget += OnLostTarget;
-            m_EnemyController.SetPathDestinationToClosestNode();
-            m_EnemyController.onDamaged += OnDamaged;
-
-            // Start patrolling
-            AiState = AIState.Patrol;
-
-            // adding a audio source to play the movement sound on it
             m_AudioSource = GetComponent<AudioSource>();
-            DebugUtility.HandleErrorIfNullGetComponent<AudioSource, EnemyMobile>(m_AudioSource, this, gameObject);
-            m_AudioSource.clip = MovementSound;
-            m_AudioSource.Play();
+            m_NavMeshAgent = GetComponent<NavMeshAgent>();
+            // ALL CLIENTS: play movement sound
+            if (m_AudioSource && MovementSound)
+            {
+                m_AudioSource.clip = MovementSound;
+                m_AudioSource.Play();
+            }
+
+            // SERVER ONLY: subscribe to AI events
+            if (IsServer)
+            {
+                m_EnemyController.onAttack += OnAttack;
+                m_EnemyController.onDetectedTarget += OnDetectedTarget;
+                m_EnemyController.onLostTarget += OnLostTarget;
+                m_EnemyController.onDamaged += OnDamaged;
+                m_EnemyController.SetPathDestinationToClosestNode();
+            }
+
+            AiState = AIState.Patrol;
         }
 
+        // UPDATE — Server runs AI, all clients update animation
         void Update()
         {
-            return; //TODO MULTIPLAYER CONVERSION: This will need to be changed to get the local player character controller instead of just finding one in the scene
+            // ALL CLIENTS: Update animation speed and audio pitch
+            // NavMeshAgent syncs via NetworkTransform, so velocity is available
+            if(m_NavMeshAgent != null && m_NavMeshAgent.enabled)
+            {
+                float moveSpeed = m_EnemyController.NavMeshAgent.velocity.magnitude;
+                Animator.SetFloat(k_AnimMoveSpeedParameter, moveSpeed);
 
+                if (m_AudioSource)
+                {
+                    m_AudioSource.pitch = Mathf.Lerp(
+                        PitchDistortionMovementSpeed.Min,
+                        PitchDistortionMovementSpeed.Max,
+                        moveSpeed / m_EnemyController.NavMeshAgent.speed);
+                }
+            }
+
+            // SERVER ONLY: AI logic
+            if (!IsServer) return;
 
             UpdateAiStateTransitions();
             UpdateCurrentAiState();
-
-            float moveSpeed = m_EnemyController.NavMeshAgent.velocity.magnitude;
-
-            // Update animator speed parameter
-            Animator.SetFloat(k_AnimMoveSpeedParameter, moveSpeed);
-
-            // changing the pitch of the movement sound depending on the movement speed
-            m_AudioSource.pitch = Mathf.Lerp(PitchDistortionMovementSpeed.Min, PitchDistortionMovementSpeed.Max,
-                moveSpeed / m_EnemyController.NavMeshAgent.speed);
         }
 
         void UpdateAiStateTransitions()
@@ -136,6 +151,12 @@ namespace Unity.FPS.AI
 
         void OnAttack()
         {
+            OnAttackClientRpc();
+        }
+
+        [ClientRpc]
+        void OnAttackClientRpc()
+        {
             Animator.SetTrigger(k_AnimAttackParameter);
         }
 
@@ -146,6 +167,12 @@ namespace Unity.FPS.AI
                 AiState = AIState.Follow;
             }
 
+            OnDetectedClientRpc();
+        }
+
+        [ClientRpc]
+        void OnDetectedClientRpc()
+        {
             for (int i = 0; i < OnDetectVfx.Length; i++)
             {
                 OnDetectVfx[i].Play();
@@ -153,7 +180,8 @@ namespace Unity.FPS.AI
 
             if (OnDetectSfx)
             {
-                AudioUtility.CreateSFX(OnDetectSfx, transform.position, AudioUtility.AudioGroups.EnemyDetection, 1f);
+                AudioUtility.CreateSFX(OnDetectSfx, transform.position,
+                    AudioUtility.AudioGroups.EnemyDetection, 1f);
             }
 
             Animator.SetBool(k_AnimAlertedParameter, true);
@@ -166,6 +194,12 @@ namespace Unity.FPS.AI
                 AiState = AIState.Patrol;
             }
 
+            OnLostTargetClientRpc();
+        }
+
+        [ClientRpc]
+        void OnLostTargetClientRpc()
+        {
             for (int i = 0; i < OnDetectVfx.Length; i++)
             {
                 OnDetectVfx[i].Stop();
@@ -175,6 +209,12 @@ namespace Unity.FPS.AI
         }
 
         void OnDamaged()
+        {
+            OnDamagedClientRpc();
+        }
+
+        [ClientRpc]
+        void OnDamagedClientRpc()
         {
             if (RandomHitSparks.Length > 0)
             {
