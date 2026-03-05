@@ -6,7 +6,7 @@ using UnityEngine.Events;
 namespace Unity.FPS.Gameplay
 {
     [RequireComponent(typeof(CharacterController), typeof(PlayerInputHandler), typeof(AudioSource))]
-    public class PlayerCharacterController : NetworkBehaviour, INetworkShooter
+    public class PlayerCharacterController : NetworkBehaviour, INetworkShooter, IPlayerController
     {
         [Header("References")] [Tooltip("Reference to the main camera used for the player")]
         public Camera PlayerCamera;
@@ -105,6 +105,7 @@ namespace Unity.FPS.Gameplay
         public bool IsDead { get; private set; }
         public bool IsCrouching { get; private set; }
 
+        bool m_IsDead;
         public float RotationMultiplier
         {
             get
@@ -158,10 +159,25 @@ namespace Unity.FPS.Gameplay
                 actorsManager.Actors.Add(actor);
                 Debug.Log($"[Player] Registered as actor. Total: {actorsManager.Actors.Count}");
             }
+
+            // SERVER: Register player for kill tracking
+            if (IsServer)
+            {
+                GameFlowManager gfm = FindObjectOfType<GameFlowManager>();
+                if (gfm != null)
+                {
+                    gfm.RegisterPlayer(OwnerClientId);
+                }
+            }
+
+
+            // ALL CLIENTS: Subscribe to death
+            Health health = GetComponent<Health>();
+            health.OnDie += OnDie;
         }
 
+        
 
-      
 
         void Start()
         {
@@ -193,6 +209,15 @@ namespace Unity.FPS.Gameplay
 
         void Update()
         {
+
+            if (!IsOwner) return;
+            Debug.Log($"[Player] Update. m_IsDead: {m_IsDead}");
+
+            if (m_IsDead) return;  // Can't move or shoot while dead
+
+            // ... rest of your existing Update code
+
+
             if (IsOwner)
             {
                 if (!IsDead && transform.position.y < KillHeight)
@@ -245,16 +270,40 @@ namespace Unity.FPS.Gameplay
         }
 
 
-    
+
         void OnDie()
         {
-            IsDead = true;
 
-            // Tell the weapons manager to switch to a non-existing weapon in order to lower the weapon
-            m_WeaponsManager.SwitchToWeaponIndex(-1, true);
+            Debug.Log($"[Player] OnDie called. IsOwner: {IsOwner}");
+            if (!IsOwner) return;
 
-            EventManager.Broadcast(Events.PlayerDeathEvent);
+            // Disable player input and movement
+            m_IsDead = true;
+
+            // Disable weapon visuals
+            PlayerWeaponsManager weaponsManager = GetComponent<PlayerWeaponsManager>();
+            if (weaponsManager != null)
+            {
+                weaponsManager.enabled = false;
+            }
         }
+
+        public void OnRespawn()
+        {
+            if (!IsOwner) return;
+
+         
+            m_IsDead = false;
+
+            // Re-enable weapons
+            PlayerWeaponsManager weaponsManager = GetComponent<PlayerWeaponsManager>();
+            if (weaponsManager != null)
+            {
+                weaponsManager.enabled = true;
+            }
+        }
+
+   
 
         void GroundCheck()
         {

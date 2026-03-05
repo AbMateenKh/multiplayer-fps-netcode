@@ -7,7 +7,8 @@ namespace Unity.FPS.Game
 {
     public class Health : NetworkBehaviour
     {
-        [Tooltip("Maximum amount of health")] public float MaxHealth = 10f;
+        [Tooltip("Maximum amount of health")]
+        public float MaxHealth = 10f;
 
         [Tooltip("Health ratio at which the critical health vignette starts appearing")]
         public float CriticalHealthRatio = 0.3f;
@@ -16,26 +17,25 @@ namespace Unity.FPS.Game
         public UnityAction<float> OnHealed;
         public UnityAction OnDie;
 
-
-        // NETWORKED STATE
-        // Server writes, all clients read
         public NetworkVariable<float> CurrentHealth = new NetworkVariable<float>(
             0f,
-            NetworkVariableReadPermission.Everyone,    // All clients can read
-            NetworkVariableWritePermission.Server       // Only server can write
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Server
         );
+
         public bool Invincible { get; set; }
         public bool CanPickup() => CurrentHealth.Value < MaxHealth;
-
         public float GetRatio() => CurrentHealth.Value / MaxHealth;
         public bool IsCritical() => GetRatio() <= CriticalHealthRatio;
 
         bool m_IsDead;
 
+        // NEW: Track who last dealt damage (server only)
+        GameObject m_LastDamageSource;
 
         public override void OnNetworkSpawn()
         {
-            if(IsServer)
+            if (IsServer)
             {
                 CurrentHealth.Value = MaxHealth;
             }
@@ -48,33 +48,26 @@ namespace Unity.FPS.Game
             CurrentHealth.OnValueChanged -= OnHealthChanged;
         }
 
-        private void OnHealthChanged(float previousValue, float newValue)
+        void OnHealthChanged(float previousValue, float newValue)
         {
-            // Someone took damage
             if (newValue < previousValue)
             {
                 float damageAmount = previousValue - newValue;
                 OnDamaged?.Invoke(damageAmount, null);
             }
-            // Someone got healed
             else if (newValue > previousValue)
             {
                 float healAmount = newValue - previousValue;
                 OnHealed?.Invoke(healAmount);
             }
 
-            // Check for death on all clients
-            // so each client can react (animations, UI, etc.)
-            if (newValue <= 0f && !m_IsDead)
+            // Client-side death effects ONLY — no m_IsDead here
+            if (newValue <= 0f && previousValue > 0f)
             {
-                m_IsDead = true;
                 OnDie?.Invoke();
             }
         }
-        /// <summary>
-        /// Only Server will heal
-        /// </summary>
-        /// <param name="healAmount"></param>
+
         public void Heal(float healAmount)
         {
             if (IsServer)
@@ -87,6 +80,7 @@ namespace Unity.FPS.Game
                 HealServerRpc(healAmount);
             }
         }
+
         [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
         void HealServerRpc(float healAmount)
         {
@@ -95,36 +89,81 @@ namespace Unity.FPS.Game
 
         public void TakeDamage(float damage, GameObject damageSource)
         {
-            // If we're the server, just do it
             if (IsServer)
             {
                 if (Invincible) return;
 
-                CurrentHealth.Value -= damage;
-                CurrentHealth.Value = Mathf.Clamp(CurrentHealth.Value, 0f, MaxHealth);
-                HandleDeath();
+                m_LastDamageSource = damageSource;
+
+                float newHealth = Mathf.Clamp(CurrentHealth.Value - damage, 0f, MaxHealth);
+
+                // Check death BEFORE setting NetworkVariable
+                if (newHealth <= 0f && !m_IsDead)
+                {
+                    CurrentHealth.Value = newHealth;
+                    ProcessDeath();
+                }
+                else
+                {
+                    CurrentHealth.Value = newHealth;
+                }
             }
-            // If we're a client, ask the server to do it
             else
             {
                 TakeDamageServerRpc(damage);
             }
         }
 
+        void ProcessDeath()
+        {
 
-        [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
+            Debug.Log($"[Health] ProcessDeath ENTRY. m_IsDead: {m_IsDead}");
+            if (m_IsDead) return;
+            Debug.Log($"[Health] ProcessDeath PASSED m_IsDead check");
+            
+
+            m_IsDead = true;
+            Invincible = true;
+
+            IPlayerController playerController = GetComponent<IPlayerController>();
+            if (playerController != null)
+            {
+                GameFlowManager gfm = FindFirstObjectByType<GameFlowManager>();
+                if (gfm != null)
+                {
+                    ulong victimId = GetComponent<NetworkObject>().OwnerClientId;
+
+                    ulong killerId = victimId;
+                    if (m_LastDamageSource != null)
+                    {
+                        NetworkObject killerNetObj =
+                            m_LastDamageSource.GetComponent<NetworkObject>();
+                        if (killerNetObj != null)
+                        {
+                            killerId = killerNetObj.OwnerClientId;
+                        }
+                    }
+
+                    Debug.Log($"[Health] Recording kill. Victim: {victimId}, Killer: {killerId}");
+                    gfm.RecordKill(victimId, killerId);
+                    gfm.RequestRespawn(victimId);
+                }
+            }
+        }
+
+            [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
         public void TakeDamageServerRpc(float damage)
         {
             TakeDamage(damage, null);
         }
 
-        // KILL — Server only
         public void Kill()
         {
             if (IsServer)
             {
+                if (m_IsDead) return;
                 CurrentHealth.Value = 0f;
-                HandleDeath();
+                ProcessDeath();
             }
             else
             {
@@ -132,26 +171,81 @@ namespace Unity.FPS.Game
             }
         }
 
-        [Rpc(SendTo.Server,InvokePermission = RpcInvokePermission.Everyone)]
+        [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
         public void KillServerRpc()
         {
             Kill();
         }
 
-        
+        // ============================================
+        // RESPAWN — Called by GameFlowManager after delay
+        // Resets health and death state
+        // ============================================
+        public void Respawn()
+        {
+            if (!IsServer) return;
 
+            m_IsDead = false;
+            m_LastDamageSource = null;
+            CurrentHealth.Value = MaxHealth;
 
-        // DEATH — Server checks, NetworkVariable
-        // change triggers reaction on all clients
+            // Tell clients to reset death state
+            RespawnClientRpc();
+        }
+
+        [ClientRpc]
+        void RespawnClientRpc()
+        {
+            m_IsDead = false;
+
+            // Notify player controller to re-enable
+            IPlayerController playerController = GetComponent<IPlayerController>();
+            if (playerController != null)
+            {
+                playerController.OnRespawn();
+            }
+        }
+
+        // ============================================
+        // DEATH — Server handles kill tracking + respawn
+        // ============================================
         void HandleDeath()
         {
-            if (m_IsDead) return;
+            //if (m_IsDead) return;
 
-            if (CurrentHealth.Value <= 0f)
-            {
-                m_IsDead = true;
-                OnDie?.Invoke();
-            }
+            //if (CurrentHealth.Value <= 0f)
+            //{
+            //    m_IsDead = true;
+            //    Invincible = true;
+
+            //    // DON'T call OnDie here — OnHealthChanged already fires it on all clients
+            //    // OnDie?.Invoke();  ← REMOVE THIS
+
+            //    // Server-only: record kill and respawn
+            //    IPlayerController playerController = GetComponent<IPlayerController>();
+            //    if (playerController != null)
+            //    {
+            //        GameFlowManager gfm = FindObjectOfType<GameFlowManager>();
+            //        if (gfm != null)
+            //        {
+            //            ulong victimId = GetComponent<NetworkObject>().OwnerClientId;
+
+            //            ulong killerId = victimId;
+            //            if (m_LastDamageSource != null)
+            //            {
+            //                NetworkObject killerNetObj =
+            //                    m_LastDamageSource.GetComponent<NetworkObject>();
+            //                if (killerNetObj != null)
+            //                {
+            //                    killerId = killerNetObj.OwnerClientId;
+            //                }
+            //            }
+
+            //            gfm.RecordKill(victimId, killerId);
+            //            gfm.RequestRespawn(victimId);
+            //        }
+            //    }
+            //}
         }
     }
 }
