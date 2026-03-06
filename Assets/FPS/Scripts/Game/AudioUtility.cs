@@ -22,9 +22,11 @@ namespace Unity.FPS.Game
             EnemyAttack
         }
 
-        public static void CreateSFX(AudioClip clip, Vector3 position, AudioGroups audioGroup, float spatialBlend,
-            float rolloffDistanceMin = 1f)
+        public static void CreateSFX(AudioClip clip, Vector3 position, AudioGroups audioGroup,
+    float spatialBlend, float rolloffDistanceMin = 1f)
         {
+            if (clip == null) return;
+
             GameObject impactSfxInstance = new GameObject();
             impactSfxInstance.transform.position = position;
             AudioSource source = impactSfxInstance.AddComponent<AudioSource>();
@@ -44,6 +46,13 @@ namespace Unity.FPS.Game
             if (s_AudioManager == null)
                 s_AudioManager = GameObject.FindObjectOfType<AudioManager>();
 
+            // Guard against missing AudioManager
+            if (s_AudioManager == null)
+            {
+                Debug.LogWarning("AudioManager not found in scene");
+                return null;
+            }
+
             var groups = s_AudioManager.FindMatchingGroups(group.ToString());
 
             if (groups.Length > 0)
@@ -58,6 +67,8 @@ namespace Unity.FPS.Game
             if (s_AudioManager == null)
                 s_AudioManager = GameObject.FindObjectOfType<AudioManager>();
 
+            if (s_AudioManager == null) return;
+
             if (value <= 0)
                 value = 0.001f;
             float valueInDb = Mathf.Log10(value) * 20;
@@ -69,6 +80,8 @@ namespace Unity.FPS.Game
         {
             if (s_AudioManager == null)
                 s_AudioManager = GameObject.FindObjectOfType<AudioManager>();
+
+            if (s_AudioManager == null) return 1f;
 
             s_AudioManager.GetFloat("MasterVolume", out var valueInDb);
             return Mathf.Pow(10f, valueInDb / 20.0f);

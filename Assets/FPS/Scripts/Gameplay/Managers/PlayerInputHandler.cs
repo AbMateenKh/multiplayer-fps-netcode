@@ -43,13 +43,23 @@ namespace Unity.FPS.Gameplay
             m_FireInputWasHeld = GetFireInputHeld();
         }
 
-        public bool CanProcessInput()
+        bool CanProcessInput()
         {
-            // Added: only process input if we own this player
             if (m_NetworkBehaviour != null && !m_NetworkBehaviour.IsOwner)
                 return false;
 
-            return Cursor.lockState == CursorLockMode.Locked && !m_GameFlowManager.GameIsEnding;
+            // Lazy find — GameFlowManager might not exist yet when Start() runs
+            if (m_GameFlowManager == null)
+            {
+                m_GameFlowManager = FindAnyObjectByType<GameFlowManager>();
+            }
+
+
+            // Still null? Allow input (match hasn't started restricting yet)
+            if (m_GameFlowManager == null)
+                return true;
+
+            return !m_GameFlowManager.GameIsEnding;
         }
 
         public Vector3 GetMoveInput()

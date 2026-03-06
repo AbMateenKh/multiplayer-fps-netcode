@@ -144,7 +144,27 @@ namespace Unity.FPS.Gameplay
         {
             if (IsOwner)
             {
+                var spawnPoints = FindObjectsByType<PlayerSpawnPoint>(FindObjectsSortMode.None);
+                Debug.Log($"[Player] SpawnPoints found: {spawnPoints.Length}");
+
+                if (spawnPoints.Length > 0)
+                {
+                    Transform point = spawnPoints[Random.Range(0, spawnPoints.Length)].transform;
+                    Debug.Log($"[Player] Teleporting to: {point.position}");
+
+                    CharacterController cc = GetComponent<CharacterController>();
+                    Debug.Log($"[Player] CharacterController: {cc != null}");
+
+                    if (cc != null) cc.enabled = false;
+
+                    transform.position = point.position;
+
+                    if (cc != null) cc.enabled = true;
+
+                    Debug.Log($"[Player] Final position: {transform.position}");
+                }
                 // Tell everyone "the local player is ready"
+                StartCoroutine(TeleportToSpawnPoint());
                 OnLocalPlayerSpawned?.Invoke(this);
             }
 
@@ -176,8 +196,30 @@ namespace Unity.FPS.Gameplay
             health.OnDie += OnDie;
         }
 
-        
 
+        System.Collections.IEnumerator TeleportToSpawnPoint()
+        {
+            // Wait one frame for scene to fully load
+            yield return null;
+
+            var spawnPoints = FindObjectsByType<PlayerSpawnPoint>(FindObjectsSortMode.None);
+            Debug.Log($"[Player] SpawnPoints found: {spawnPoints.Length}");
+
+            if (spawnPoints.Length > 0)
+            {
+                Transform point = spawnPoints[Random.Range(0, spawnPoints.Length)].transform;
+
+                CharacterController cc = GetComponent<CharacterController>();
+                if (cc != null) cc.enabled = false;
+
+                transform.position = point.position;
+                transform.rotation = point.rotation;
+
+                if (cc != null) cc.enabled = true;
+
+                Debug.Log($"[Player] Spawned at: {transform.position}");
+            }
+        }
 
         void Start()
         {

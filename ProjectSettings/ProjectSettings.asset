@@ -788,11 +788,11 @@ PlayerSettings:
   captureStartupLogs: {}
   activeInputHandler: 2
   windowsGamepadBackendHint: 0
-  cloudProjectId: 10bdb69d-2a75-4d37-b3f4-295bd510813e
+  cloudProjectId: b89b1253-75c6-4d49-9776-c5bfcabee30c
   framebufferDepthMemorylessMode: 0
   qualitySettingsNames: []
-  projectName: 
-  organizationId: abdulmateenkhan
+  projectName: Netcode-FPS-Multiplayer
+  organizationId: unity_144f3656437c86b2610c
   cloudEnabled: 0
   legacyClampBlendShapeWeights: 0
   hmiLoadingImage: {fileID: 0}
