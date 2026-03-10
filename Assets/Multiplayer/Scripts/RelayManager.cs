@@ -10,6 +10,7 @@ public class RelayManager : MonoBehaviour
 {
     public static RelayManager Instance { get; private set; }
 
+   
     void Awake()
     {
         if (Instance != null && Instance != this)
@@ -18,6 +19,7 @@ public class RelayManager : MonoBehaviour
             return;
         }
         Instance = this;
+        DontDestroyOnLoad(gameObject);
     }
 
     /// <summary>

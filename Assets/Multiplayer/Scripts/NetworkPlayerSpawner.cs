@@ -1,56 +1,65 @@
+using System.Collections.Generic;
 using Unity.FPS.Game;
 using Unity.Netcode;
 using UnityEngine;
 
-public class PlayerSpawner : NetworkBehaviour
+public class NetworkPlayerSpawner : MonoBehaviour
 {
-    [Header("Player Prefab")]
     public GameObject PlayerPrefab;
+    public string GameSceneName = "MainScene";
 
-    public override void OnNetworkSpawn()
+    bool m_GameSceneLoaded = false;
+
+    void Start()
     {
-        Debug.Log($"[Spawner] OnNetworkSpawn. IsServer: {IsServer}");
+        NetworkManager.Singleton.OnServerStarted += OnServerStarted;
+    }
 
-        if (IsServer)
-        {
-            Debug.Log($"[Spawner] Connected clients: {NetworkManager.Singleton.ConnectedClientsList.Count}");
-
-            foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
-            {
-                Debug.Log($"[Spawner] Client {client.ClientId}, " +
-                          $"HasPlayer: {client.PlayerObject != null}");
-
-                if (client.PlayerObject == null)
-                {
-                    SpawnPlayer(client.ClientId);
-                }
-            }
-
-            NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
-        }
+    void OnServerStarted()
+    {
+        Debug.Log("[Spawner] Server started");
+        NetworkManager.Singleton.SceneManager.OnLoadEventCompleted += OnSceneLoadComplete;
+        NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
     }
 
     void OnSceneLoadComplete(string sceneName,
         UnityEngine.SceneManagement.LoadSceneMode loadSceneMode,
-        System.Collections.Generic.List<ulong> clientsCompleted,
-        System.Collections.Generic.List<ulong> clientsTimedOut)
+        List<ulong> clientsCompleted,
+        List<ulong> clientsTimedOut)
     {
-        Debug.Log($"[Spawner] Scene '{sceneName}' load complete. " +
-                  $"Clients: {clientsCompleted.Count}");
+        Debug.Log($"[Spawner] Scene '{sceneName}' load complete");
 
-        // Spawn for all connected clients who don't have a player yet
-        foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
+        if (sceneName == GameSceneName)
         {
-            if (client.PlayerObject == null)
+            m_GameSceneLoaded = true;
+
+            // Spawn for all connected clients
+            foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
             {
-                SpawnPlayer(client.ClientId);
+                if (client.PlayerObject == null)
+                {
+                    SpawnPlayer(client.ClientId);
+                }
             }
         }
     }
 
     void OnClientConnected(ulong clientId)
     {
-        // For clients who join after scene is already loaded
+        // Only spawn if game scene is loaded
+        if (!m_GameSceneLoaded)
+        {
+            Debug.Log($"[Spawner] Client {clientId} connected but game scene not loaded yet");
+            return;
+        }
+
+        StartCoroutine(DelayedSpawn(clientId));
+    }
+
+    System.Collections.IEnumerator DelayedSpawn(ulong clientId)
+    {
+        yield return new WaitForSeconds(0.5f);
+
         if (NetworkManager.Singleton.ConnectedClients.TryGetValue(clientId, out var client))
         {
             if (client.PlayerObject == null)
@@ -80,10 +89,11 @@ public class PlayerSpawner : NetworkBehaviour
         player.GetComponent<NetworkObject>().SpawnAsPlayerObject(clientId, true);
     }
 
-    public override void OnNetworkDespawn()
+    void OnDestroy()
     {
-        if (IsServer && NetworkManager.Singleton != null)
+        if (NetworkManager.Singleton != null)
         {
+            NetworkManager.Singleton.OnServerStarted -= OnServerStarted;
             NetworkManager.Singleton.OnClientConnectedCallback -= OnClientConnected;
 
             if (NetworkManager.Singleton.SceneManager != null)

@@ -34,8 +34,11 @@ namespace Unity.FPS.Gameplay
             m_GameFlowManager = FindObjectOfType<GameFlowManager>();
             m_NetworkBehaviour = GetComponent<NetworkBehaviour>();
 
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
+            if (m_NetworkBehaviour != null && m_NetworkBehaviour.IsOwner)
+            {
+                Cursor.lockState = CursorLockMode.Locked;
+                Cursor.visible = false;
+            }
         }
 
         void LateUpdate()

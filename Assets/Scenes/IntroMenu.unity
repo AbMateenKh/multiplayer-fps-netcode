@@ -686,6 +686,7 @@ GameObject:
   - component: {fileID: 232965019}
   - component: {fileID: 232965018}
   - component: {fileID: 232965021}
+  - component: {fileID: 232965022}
   m_Layer: 0
   m_Name: NetworkManager
   m_TagString: Untagged
@@ -705,7 +706,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6960e84d07fb87f47956e7a81d71c4e6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_ProtocolType: 0
+  m_ProtocolType: 1
   m_UseWebSockets: 0
   m_UseEncryption: 0
   m_MaxPacketQueueSize: 128
@@ -792,6 +793,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9300c51350e3c514880d47a31f546150, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!114 &232965022
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 232965017}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7e2b79321df2e50408798f68ec10240a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  PlayerPrefab: {fileID: 7253983127304857660, guid: 761cdc9e4e883334cbdcea062d0befa7,
+    type: 3}
 --- !u!1 &859191364
 GameObject:
   m_ObjectHideFlags: 0

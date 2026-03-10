@@ -7,6 +7,11 @@ public class ServicesInitializer : MonoBehaviour
 {
     public static bool IsInitialized { get; private set; }
 
+    void Awake()
+    {
+        DontDestroyOnLoad(gameObject);
+    }
+
     async void Start()
     {
         try

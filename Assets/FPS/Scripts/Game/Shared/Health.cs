@@ -186,6 +186,7 @@ namespace Unity.FPS.Game
             if (!IsServer) return;
 
             m_IsDead = false;
+            Invincible = false;
             m_LastDamageSource = null;
             CurrentHealth.Value = MaxHealth;
 
