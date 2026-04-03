@@ -144,28 +144,7 @@ namespace Unity.FPS.Gameplay
         {
             if (IsOwner)
             {
-                var spawnPoints = FindObjectsByType<PlayerSpawnPoint>(FindObjectsSortMode.None);
-                Debug.Log($"[Player] SpawnPoints found: {spawnPoints.Length}");
-
-                if (spawnPoints.Length > 0)
-                {
-                    Transform point = spawnPoints[Random.Range(0, spawnPoints.Length)].transform;
-                    Debug.Log($"[Player] Teleporting to: {point.position}");
-
-                    CharacterController cc = GetComponent<CharacterController>();
-                    Debug.Log($"[Player] CharacterController: {cc != null}");
-
-                    if (cc != null) cc.enabled = false;
-
-                    transform.position = point.position;
-
-                    if (cc != null) cc.enabled = true;
-
-                    Debug.Log($"[Player] Final position: {transform.position}");
-                }
-                // Tell everyone "the local player is ready"
                 StartCoroutine(TeleportToSpawnPoint());
-                OnLocalPlayerSpawned?.Invoke(this);
             }
 
             // Register this player as an actor on ALL clients
@@ -191,9 +170,6 @@ namespace Unity.FPS.Gameplay
             }
 
 
-            // ALL CLIENTS: Subscribe to death
-            Health health = GetComponent<Health>();
-            health.OnDie += OnDie;
         }
 
 
@@ -219,6 +195,8 @@ namespace Unity.FPS.Gameplay
 
                 Debug.Log($"[Player] Spawned at: {transform.position}");
             }
+
+            OnLocalPlayerSpawned?.Invoke(this);
         }
 
         void Start()
@@ -246,6 +224,14 @@ namespace Unity.FPS.Gameplay
                 AudioListener listener = PlayerCamera.GetComponent<AudioListener>();
                 if (listener != null)
                     listener.enabled = false;
+            }
+        }
+
+        void OnDestroy()
+        {
+            if (m_Health != null)
+            {
+                m_Health.OnDie -= OnDie;
             }
         }
 

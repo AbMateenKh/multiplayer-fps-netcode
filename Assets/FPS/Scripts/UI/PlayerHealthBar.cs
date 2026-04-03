@@ -12,7 +12,7 @@ namespace Unity.FPS.UI
 
         Health m_PlayerHealth;
 
-        void Start()
+        void Awake()
         {
             PlayerCharacterController.OnLocalPlayerSpawned += OnLocalPlayerSpawned;
         }
@@ -45,6 +45,7 @@ namespace Unity.FPS.UI
 
         void UpdateHealthBar()
         {
+
             if (m_PlayerHealth != null)
             {
                 HealthFillImage.fillAmount = m_PlayerHealth.GetRatio();

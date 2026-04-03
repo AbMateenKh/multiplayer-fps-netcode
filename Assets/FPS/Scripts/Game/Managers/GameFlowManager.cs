@@ -13,7 +13,7 @@ namespace Unity.FPS.Game
         public float MatchDuration = 180f; // 3 minutes
 
         [Tooltip("Delay before respawning after death")]
-        public float RespawnDelay = 3f;
+        public static float RespawnDelay = 3f;
 
         [Header("End Game")]
         [Tooltip("Duration of the fade-to-black at the end of the game")]
