@@ -141,6 +141,9 @@ namespace Unity.FPS.Game
         float m_CurrentAmmo;
         float m_LastTimeShot = Mathf.NegativeInfinity;
         float m_LastServerAuthorizedShotTime = Mathf.NegativeInfinity;
+        int m_NextServerPelletIndex = -1;
+        float m_ServerChargeStartedTime = Mathf.NegativeInfinity;
+        float m_ServerChargeAmmoSpent;
         public float LastChargeTriggerTimestamp { get; private set; }
         Vector3 m_LastMuzzlePosition;
 
@@ -225,7 +228,10 @@ namespace Unity.FPS.Game
             }
             return m_NetworkShooter;
         }
-        public void AddCarriablePhysicalBullets(int count) => m_CarriedPhysicalBullets = Mathf.Max(m_CarriedPhysicalBullets + count, MaxAmmo);
+        public void AddCarriablePhysicalBullets(int count)
+        {
+            m_CarriedPhysicalBullets = Mathf.Clamp(m_CarriedPhysicalBullets + count, 0, MaxAmmo);
+        }
 
         void ShootShell()
         {
@@ -248,7 +254,9 @@ namespace Unity.FPS.Game
         {
             if (m_CarriedPhysicalBullets > 0)
             {
-                m_CurrentAmmo = Mathf.Min(m_CarriedPhysicalBullets, ClipSize);
+                float ammoToLoad = Mathf.Min(m_CarriedPhysicalBullets, ClipSize - m_CurrentAmmo);
+                m_CurrentAmmo = Mathf.Min(m_CurrentAmmo + ammoToLoad, ClipSize);
+                m_CarriedPhysicalBullets -= Mathf.RoundToInt(ammoToLoad);
             }
 
             IsReloading = false;
@@ -260,6 +268,9 @@ namespace Unity.FPS.Game
             m_CarriedPhysicalBullets = HasPhysicalBullets ? ClipSize : 0;
             m_LastTimeShot = Mathf.NegativeInfinity;
             m_LastServerAuthorizedShotTime = Mathf.NegativeInfinity;
+            m_NextServerPelletIndex = -1;
+            m_ServerChargeStartedTime = Mathf.NegativeInfinity;
+            m_ServerChargeAmmoSpent = 0f;
             LastChargeTriggerTimestamp = 0f;
             CurrentCharge = 0f;
             IsCharging = false;
@@ -271,9 +282,19 @@ namespace Unity.FPS.Game
 
         public void StartReloadAnimation()
         {
-            if (m_CurrentAmmo < m_CarriedPhysicalBullets)
+            if (m_CurrentAmmo < ClipSize && m_CarriedPhysicalBullets > 0)
             {
-                GetComponent<Animator>().SetTrigger("Reload");
+                Animator animator = GetComponent<Animator>();
+                if (animator != null)
+                {
+                    animator.SetTrigger("Reload");
+                }
+                else
+                {
+                    Reload();
+                    return;
+                }
+
                 IsReloading = true;
             }
         }
@@ -389,8 +410,6 @@ namespace Unity.FPS.Game
         public void UseAmmo(float amount)
         {
             m_CurrentAmmo = Mathf.Clamp(m_CurrentAmmo - amount, 0f, MaxAmmo);
-            m_CarriedPhysicalBullets -= Mathf.RoundToInt(amount);
-            m_CarriedPhysicalBullets = Mathf.Clamp(m_CarriedPhysicalBullets, 0, MaxAmmo);
             m_LastTimeShot = Time.time;
         }
 
@@ -403,23 +422,78 @@ namespace Unity.FPS.Game
 
             if (shotIndex > 0)
             {
-                if (Time.time - m_LastServerAuthorizedShotTime > 0.25f)
+                if (shotIndex != m_NextServerPelletIndex ||
+                    Time.time - m_LastServerAuthorizedShotTime > 0.25f)
                     return false;
+
+                m_NextServerPelletIndex++;
+                if (m_NextServerPelletIndex >= BulletsPerShot)
+                {
+                    m_NextServerPelletIndex = -1;
+                }
 
                 validatedDamage = Damage;
                 return true;
             }
 
-            if (consumeShotAmmo && (m_CurrentAmmo < 1f || m_LastTimeShot + DelayBetweenShots >= Time.time))
-                return false;
+            if (ShootType == WeaponShootType.Charge)
+            {
+                float elapsedChargeTime = AutomaticReleaseOnCharged
+                    ? MaxChargeDuration
+                    : Mathf.Min(MaxChargeDuration, Mathf.Max(0.05f, Time.time - m_ServerChargeStartedTime));
+                float chargeRatio = MaxChargeDuration <= 0f ? 1f : Mathf.Clamp01(elapsedChargeTime / MaxChargeDuration);
+                float requiredAmmo = Mathf.Max(AmmoUsedOnStartCharge,
+                    AmmoUsedOnStartCharge + chargeRatio * AmmoUsageRateWhileCharging);
 
-            if (consumeShotAmmo)
+                if (consumeShotAmmo)
+                {
+                    if (float.IsNegativeInfinity(m_ServerChargeStartedTime))
+                        return false;
+
+                    if (MaxChargeDuration > 0f && Time.time - m_ServerChargeStartedTime < 0.05f)
+                        return false;
+
+                    if (m_CurrentAmmo < requiredAmmo - m_ServerChargeAmmoSpent)
+                        return false;
+
+                    UseAmmo(Mathf.Max(0f, requiredAmmo - m_ServerChargeAmmoSpent));
+                    m_ServerChargeStartedTime = Mathf.NegativeInfinity;
+                    m_ServerChargeAmmoSpent = 0f;
+                }
+            }
+            else if (consumeShotAmmo && (m_CurrentAmmo < 1f || m_LastTimeShot + DelayBetweenShots >= Time.time))
+            {
+                return false;
+            }
+
+            if (consumeShotAmmo && ShootType != WeaponShootType.Charge)
             {
                 UseAmmo(1f);
             }
 
             m_LastServerAuthorizedShotTime = Time.time;
+            m_NextServerPelletIndex = BulletsPerShot > 1 ? 1 : -1;
             validatedDamage = Damage;
+            return true;
+        }
+
+        public bool TryAuthorizeServerChargeStart()
+        {
+            if (ShootType != WeaponShootType.Charge)
+                return false;
+
+            if (!float.IsNegativeInfinity(m_ServerChargeStartedTime))
+                return true;
+
+            if (m_CurrentAmmo < AmmoUsedOnStartCharge ||
+                m_LastTimeShot + DelayBetweenShots >= Time.time)
+            {
+                return false;
+            }
+
+            UseAmmo(AmmoUsedOnStartCharge);
+            m_ServerChargeStartedTime = Time.time;
+            m_ServerChargeAmmoSpent = AmmoUsedOnStartCharge;
             return true;
         }
 
@@ -488,6 +562,7 @@ namespace Unity.FPS.Game
 
                 LastChargeTriggerTimestamp = Time.time;
                 IsCharging = true;
+                GetNetworkShooter()?.RequestChargeStart();
 
                 return true;
             }
@@ -547,7 +622,6 @@ namespace Unity.FPS.Game
             if (HasPhysicalBullets)
             {
                 ShootShell();
-                m_CarriedPhysicalBullets--;
             }
 
             m_LastTimeShot = Time.time;

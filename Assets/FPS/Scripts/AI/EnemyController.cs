@@ -570,5 +570,15 @@ namespace Unity.FPS.AI
                 }
             }
         }
+
+        public void RequestChargeStart()
+        {
+            if (!IsServer)
+            {
+                return;
+            }
+
+            GetCurrentWeapon()?.TryAuthorizeServerChargeStart();
+        }
     }
 }

@@ -596,6 +596,17 @@ namespace Unity.FPS.Gameplay
             RequestShootServerRpc(origin, direction.normalized, shotIndex);
         }
 
+        public void RequestChargeStart()
+        {
+            if (IsDeadOrUnableToAct() || !IsLocalGameplayActive())
+                return;
+
+            if (IsServer && IsOwner)
+                return;
+
+            RequestChargeStartServerRpc();
+        }
+
         public void RequestPickup(Pickup pickup)
         {
             if (pickup == null || IsDeadOrUnableToAct() || !IsLocalGameplayActive())
@@ -664,6 +675,15 @@ namespace Unity.FPS.Gameplay
             {
                 pickup.ConsumeLocally(true, false);
             }
+        }
+
+        [ServerRpc]
+        void RequestChargeStartServerRpc()
+        {
+            if (!IsServer || IsDeadOrUnableToAct() || !IsServerGameplayActive())
+                return;
+
+            m_WeaponsManager?.TryAuthorizeServerChargeStart();
         }
 
         [ServerRpc]

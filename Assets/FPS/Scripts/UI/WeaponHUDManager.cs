@@ -78,6 +78,9 @@ namespace Unity.FPS.UI
 
         void AddWeapon(WeaponController newWeapon, int weaponIndex)
         {
+            if (newWeapon == null || HasCounterForWeaponIndex(weaponIndex))
+                return;
+
             GameObject ammoCounterInstance = Instantiate(AmmoCounterPrefab, AmmoPanel);
             AmmoCounter newAmmoCounter = ammoCounterInstance.GetComponent<AmmoCounter>();
             DebugUtility.HandleErrorIfNullGetComponent<AmmoCounter, WeaponHUDManager>(newAmmoCounter, this,
@@ -108,7 +111,21 @@ namespace Unity.FPS.UI
 
         void ChangeWeapon(WeaponController weapon)
         {
-            UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(AmmoPanel);
+            if (AmmoPanel != null)
+            {
+                UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(AmmoPanel);
+            }
+        }
+
+        bool HasCounterForWeaponIndex(int weaponIndex)
+        {
+            for (int i = 0; i < m_AmmoCounters.Count; i++)
+            {
+                if (m_AmmoCounters[i] != null && m_AmmoCounters[i].WeaponCounterIndex == weaponIndex)
+                    return true;
+            }
+
+            return false;
         }
     }
 }

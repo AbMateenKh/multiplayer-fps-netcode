@@ -608,6 +608,19 @@ namespace Unity.FPS.Gameplay
             return activeWeapon.TryAuthorizeServerShot(shotIndex, consumeShotAmmo, out validatedDamage);
         }
 
+        public bool TryAuthorizeServerChargeStart()
+        {
+            int serverActiveWeaponIndex = IsServer && !IsOwner
+                ? m_NetworkActiveWeaponIndex.Value
+                : ActiveWeaponIndex;
+
+            WeaponController activeWeapon = GetWeaponAtSlotIndex(serverActiveWeaponIndex);
+            if (activeWeapon == null)
+                return false;
+
+            return activeWeapon.TryAuthorizeServerChargeStart();
+        }
+
         public WeaponController GetWeaponAtSlotIndex(int index)
         {
             // find the active weapon in our weapon slots based on our active weapon index

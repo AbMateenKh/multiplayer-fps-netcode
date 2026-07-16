@@ -64,7 +64,7 @@ namespace Unity.FPS.UI
 
         void UpdateCrosshairPointingAtEnemy(bool force)
         {
-            if (m_CrosshairDataDefault.CrosshairSprite == null)
+            if (CrosshairImage == null || m_CrosshairDataDefault.CrosshairSprite == null)
                 return;
 
             if ((force || !m_WasPointingAtEnemy) && m_WeaponsManager.IsPointingAtEnemy)
@@ -98,9 +98,14 @@ namespace Unity.FPS.UI
             }
             else
             {
+                m_CrosshairDataDefault = default;
+                m_CrosshairDataTarget = default;
+                m_CurrentCrosshair = default;
+
                 if (NullCrosshairSprite)
                 {
                     CrosshairImage.sprite = NullCrosshairSprite;
+                    CrosshairImage.color = Color.white;
                 }
                 else
                 {
