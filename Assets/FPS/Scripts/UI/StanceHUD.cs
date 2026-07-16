@@ -16,15 +16,34 @@ namespace Unity.FPS.UI
         [Tooltip("Sprite to display when crouching")]
         public Sprite CrouchingSprite;
 
-        void Start()
+        PlayerCharacterController m_PlayerCharacterController;
+
+        void Awake()
         {
-            //TODO MULTIPLAYER CONVERSION: This will need to be changed to get the local player character controller instead of just finding one in the scene
+            PlayerCharacterController.OnLocalPlayerSpawned += OnLocalPlayerSpawned;
+        }
 
-           // PlayerCharacterController character = FindObjectOfType<PlayerCharacterController>();
-           // DebugUtility.HandleErrorIfNullFindObject<PlayerCharacterController, StanceHUD>(character, this);
-           // character.OnStanceChanged += OnStanceChanged;
+        void OnDestroy()
+        {
+            PlayerCharacterController.OnLocalPlayerSpawned -= OnLocalPlayerSpawned;
 
-            //OnStanceChanged(character.IsCrouching);
+            if (m_PlayerCharacterController != null)
+            {
+                m_PlayerCharacterController.OnStanceChanged -= OnStanceChanged;
+            }
+        }
+
+        void OnLocalPlayerSpawned(PlayerCharacterController player)
+        {
+            if (m_PlayerCharacterController != null)
+            {
+                m_PlayerCharacterController.OnStanceChanged -= OnStanceChanged;
+            }
+
+            m_PlayerCharacterController = player;
+            m_PlayerCharacterController.OnStanceChanged += OnStanceChanged;
+
+            OnStanceChanged(m_PlayerCharacterController.IsCrouching);
         }
 
         void OnStanceChanged(bool crouched)

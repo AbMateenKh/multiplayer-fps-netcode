@@ -20,7 +20,7 @@ namespace Unity.FPS.Gameplay
             }
         }
 
-        protected override void OnPicked(PlayerCharacterController byPlayer)
+        protected override bool ApplyPickupEffect(PlayerCharacterController byPlayer, bool serverAuthoritative)
         {
             PlayerWeaponsManager playerWeaponsManager = byPlayer.GetComponent<PlayerWeaponsManager>();
             if (playerWeaponsManager)
@@ -33,10 +33,11 @@ namespace Unity.FPS.Gameplay
                         playerWeaponsManager.SwitchWeapon(true);
                     }
 
-                    PlayPickupFeedback();
-                    Destroy(gameObject);
+                    return true;
                 }
             }
+
+            return false;
         }
     }
 }

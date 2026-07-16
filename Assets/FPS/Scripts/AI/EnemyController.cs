@@ -546,30 +546,28 @@ namespace Unity.FPS.AI
             }
         }
 
-        public void RequestShoot(Vector3 origin, Vector3 direction)
+        public void RequestShoot(Vector3 origin, Vector3 direction, int shotIndex)
         {
-            Debug.Log($"[Enemy] RequestShoot fired");
+            if (!IsServer)
+            {
+                return;
+            }
+
+            WeaponController currentWeapon = GetCurrentWeapon();
+            if (currentWeapon == null ||
+                !currentWeapon.TryAuthorizeServerShot(shotIndex, false, out float validatedDamage))
+            {
+                return;
+            }
 
             if (Physics.Raycast(origin, direction, out RaycastHit hit, 1000f, -1,
                 QueryTriggerInteraction.Ignore))
             {
-                Debug.Log($"[Enemy] Raycast hit: {hit.collider.gameObject.name}");
-
-                Health targetHealth = hit.collider.GetComponentInParent<Health>();
-                if (targetHealth != null)
+                Damageable damageable = hit.collider.GetComponentInParent<Damageable>();
+                if (damageable != null)
                 {
-                    Debug.Log($"[Enemy] Applying damage to: {targetHealth.gameObject.name}, " +
-                              $"CurrentHealth: {targetHealth.CurrentHealth.Value}");
-                    targetHealth.TakeDamage(10f, gameObject);
+                    damageable.InflictDamage(validatedDamage, false, gameObject);
                 }
-                else
-                {
-                    Debug.Log($"[Enemy] No Health on: {hit.collider.gameObject.name}");
-                }
-            }
-            else
-            {
-                Debug.Log($"[Enemy] Raycast hit nothing");
             }
         }
     }

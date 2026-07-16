@@ -53,6 +53,9 @@ namespace Unity.FPS.Game
 
         [Tooltip("The projectile prefab")] public ProjectileBase ProjectilePrefab;
 
+        [Tooltip("Damage applied by one validated server hit")]
+        public float Damage = 10f;
+
         [Tooltip("Minimum duration between two shots")]
         public float DelayBetweenShots = 0.5f;
 
@@ -137,6 +140,7 @@ namespace Unity.FPS.Game
         int m_CarriedPhysicalBullets;
         float m_CurrentAmmo;
         float m_LastTimeShot = Mathf.NegativeInfinity;
+        float m_LastServerAuthorizedShotTime = Mathf.NegativeInfinity;
         public float LastChargeTriggerTimestamp { get; private set; }
         Vector3 m_LastMuzzlePosition;
 
@@ -248,6 +252,21 @@ namespace Unity.FPS.Game
             }
 
             IsReloading = false;
+        }
+
+        public void ResetWeaponState()
+        {
+            m_CurrentAmmo = MaxAmmo;
+            m_CarriedPhysicalBullets = HasPhysicalBullets ? ClipSize : 0;
+            m_LastTimeShot = Mathf.NegativeInfinity;
+            m_LastServerAuthorizedShotTime = Mathf.NegativeInfinity;
+            LastChargeTriggerTimestamp = 0f;
+            CurrentCharge = 0f;
+            IsCharging = false;
+            IsReloading = false;
+            IsCooling = false;
+            m_WantsToShoot = false;
+            UpdateAmmo();
         }
 
         public void StartReloadAnimation()
@@ -375,6 +394,35 @@ namespace Unity.FPS.Game
             m_LastTimeShot = Time.time;
         }
 
+        public bool TryAuthorizeServerShot(int shotIndex, bool consumeShotAmmo, out float validatedDamage)
+        {
+            validatedDamage = 0f;
+
+            if (shotIndex < 0 || shotIndex >= Mathf.Max(1, BulletsPerShot))
+                return false;
+
+            if (shotIndex > 0)
+            {
+                if (Time.time - m_LastServerAuthorizedShotTime > 0.25f)
+                    return false;
+
+                validatedDamage = Damage;
+                return true;
+            }
+
+            if (consumeShotAmmo && (m_CurrentAmmo < 1f || m_LastTimeShot + DelayBetweenShots >= Time.time))
+                return false;
+
+            if (consumeShotAmmo)
+            {
+                UseAmmo(1f);
+            }
+
+            m_LastServerAuthorizedShotTime = Time.time;
+            validatedDamage = Damage;
+            return true;
+        }
+
         public bool HandleShootInputs(bool inputDown, bool inputHeld, bool inputUp)
         {
             m_WantsToShoot = inputDown || inputHeld;
@@ -479,7 +527,7 @@ namespace Unity.FPS.Game
 
                 // Uses interface — no reference to fps.Gameplay!
                 GetNetworkShooter()?.RequestShoot(
-    WeaponMuzzle.position, shotDirection);
+                    WeaponMuzzle.position, shotDirection, i);
             }
 
             // muzzle flash

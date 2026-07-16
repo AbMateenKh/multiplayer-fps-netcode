@@ -20,23 +20,37 @@ namespace Unity.FPS.UI
 
         void Awake()
         {
-            //TODO MULTIPLAYER CONVERSION: This will need to be changed to get the local player character controller instead of just finding one in the scene
+            PlayerCharacterController.OnLocalPlayerSpawned += OnLocalPlayerSpawned;
+            MainCanvasGroup.gameObject.SetActive(false);
+        }
 
-            //m_Jetpack = FindObjectOfType<Jetpack>();
-            //DebugUtility.HandleErrorIfNullFindObject<Jetpack, JetpackCounter>(m_Jetpack, this);
+        void OnDestroy()
+        {
+            PlayerCharacterController.OnLocalPlayerSpawned -= OnLocalPlayerSpawned;
+        }
 
-            //FillBarColorChange.Initialize(1f, 0f);
+        void OnLocalPlayerSpawned(PlayerCharacterController player)
+        {
+            m_Jetpack = player.GetComponent<Jetpack>();
+            DebugUtility.HandleErrorIfNullGetComponent<Jetpack, JetpackCounter>(m_Jetpack, this, player.gameObject);
+
+            FillBarColorChange.Initialize(1f, 0f);
         }
 
         void Update()
         {
-            //MainCanvasGroup.gameObject.SetActive(m_Jetpack.IsJetpackUnlocked);
+            if (m_Jetpack == null)
+            {
+                return;
+            }
 
-            //if (m_Jetpack.IsJetpackUnlocked)
-            //{
-            //    JetpackFillImage.fillAmount = m_Jetpack.CurrentFillRatio;
-            //    FillBarColorChange.UpdateVisual(m_Jetpack.CurrentFillRatio);
-            //}
+            MainCanvasGroup.gameObject.SetActive(m_Jetpack.IsJetpackUnlocked);
+
+            if (m_Jetpack.IsJetpackUnlocked)
+            {
+                JetpackFillImage.fillAmount = m_Jetpack.CurrentFillRatio;
+                FillBarColorChange.UpdateVisual(m_Jetpack.CurrentFillRatio);
+            }
         }
     }
 }

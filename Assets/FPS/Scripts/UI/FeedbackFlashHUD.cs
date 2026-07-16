@@ -46,29 +46,38 @@ namespace Unity.FPS.UI
         Health m_PlayerHealth;
         GameFlowManager m_GameFlowManager;
 
-        void Start()
+        void Awake()
         {
-
-            // Subscribe to the event
             PlayerCharacterController.OnLocalPlayerSpawned += OnLocalPlayerSpawned;
-
-
-            //TODO MULTIPLAYER CONVERSION: This will need to be changed to get the local player character controller instead of just finding one in the scene
-
-            //// Subscribe to player damage events
-            //PlayerCharacterController playerCharacterController = FindObjectOfType<PlayerCharacterController>();
-            //m_PlayerHealth = playerCharacterController.GetComponent<Health>();
-            //m_PlayerHealth.OnDamaged += OnTakeDamage;
-            //m_PlayerHealth.OnHealed += OnHealed;
-            
             m_GameFlowManager = FindObjectOfType<GameFlowManager>();
+
+            FlashCanvasGroup.gameObject.SetActive(false);
+            VignetteCanvasGroup.gameObject.SetActive(false);
         }
 
-        private void OnLocalPlayerSpawned(PlayerCharacterController controller)
+        void OnDestroy()
         {
+            PlayerCharacterController.OnLocalPlayerSpawned -= OnLocalPlayerSpawned;
+            UnbindPlayerHealth();
+        }
+
+        void OnLocalPlayerSpawned(PlayerCharacterController controller)
+        {
+            UnbindPlayerHealth();
+
             m_PlayerHealth = controller.GetComponent<Health>();
             m_PlayerHealth.OnDamaged += OnTakeDamage;
             m_PlayerHealth.OnHealed += OnHealed;
+        }
+
+        void UnbindPlayerHealth()
+        {
+            if (m_PlayerHealth != null)
+            {
+                m_PlayerHealth.OnDamaged -= OnTakeDamage;
+                m_PlayerHealth.OnHealed -= OnHealed;
+                m_PlayerHealth = null;
+            }
         }
 
         void Update()

@@ -48,8 +48,10 @@ public class RelayManager : MonoBehaviour
                 allocation.ConnectionData
             );
 
-            // Start host
-            NetworkManager.Singleton.StartHost();
+            if (!NetworkManager.Singleton.IsListening)
+            {
+                NetworkManager.Singleton.StartHost();
+            }
 
             return joinCode;
         }
@@ -82,8 +84,10 @@ public class RelayManager : MonoBehaviour
                 joinAllocation.HostConnectionData
             );
 
-            // Start client
-            NetworkManager.Singleton.StartClient();
+            if (!NetworkManager.Singleton.IsListening)
+            {
+                NetworkManager.Singleton.StartClient();
+            }
 
             return true;
         }

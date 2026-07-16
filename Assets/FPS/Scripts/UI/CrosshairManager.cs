@@ -18,24 +18,48 @@ namespace Unity.FPS.UI
         CrosshairData m_CrosshairDataTarget;
         CrosshairData m_CurrentCrosshair;
 
-        void Start()
+        void Awake()
         {
-            //TODO MULTIPLAYER CONVERSION: This will need to be changed to get the local player character controller instead of just finding one in the scene
+            PlayerCharacterController.OnLocalPlayerSpawned += OnLocalPlayerSpawned;
+            m_CrosshairRectTransform = CrosshairImage.GetComponent<RectTransform>();
+            DebugUtility.HandleErrorIfNullGetComponent<RectTransform, CrosshairManager>(m_CrosshairRectTransform,
+                this, CrosshairImage.gameObject);
+        }
 
-            //m_WeaponsManager = GameObject.FindObjectOfType<PlayerWeaponsManager>();
-            //DebugUtility.HandleErrorIfNullFindObject<PlayerWeaponsManager, CrosshairManager>(m_WeaponsManager, this);
+        void OnDestroy()
+        {
+            PlayerCharacterController.OnLocalPlayerSpawned -= OnLocalPlayerSpawned;
 
-            //OnWeaponChanged(m_WeaponsManager.GetActiveWeapon());
+            if (m_WeaponsManager != null)
+            {
+                m_WeaponsManager.OnSwitchedToWeapon -= OnWeaponChanged;
+            }
+        }
 
-            //m_WeaponsManager.OnSwitchedToWeapon += OnWeaponChanged;
+        void OnLocalPlayerSpawned(PlayerCharacterController player)
+        {
+            if (m_WeaponsManager != null)
+            {
+                m_WeaponsManager.OnSwitchedToWeapon -= OnWeaponChanged;
+            }
+
+            m_WeaponsManager = player.GetComponent<PlayerWeaponsManager>();
+            DebugUtility.HandleErrorIfNullGetComponent<PlayerWeaponsManager, CrosshairManager>(m_WeaponsManager,
+                this, player.gameObject);
+
+            OnWeaponChanged(m_WeaponsManager.GetActiveWeapon());
+            m_WeaponsManager.OnSwitchedToWeapon += OnWeaponChanged;
         }
 
         void Update()
         {
+            if (m_WeaponsManager == null)
+            {
+                return;
+            }
 
-            //TODO MULTIPLAYER CONVERSION: This will need to be changed to get the local player character controller instead of just finding one in the scene
-            // UpdateCrosshairPointingAtEnemy(false);
-            // m_WasPointingAtEnemy = m_WeaponsManager.IsPointingAtEnemy;
+            UpdateCrosshairPointingAtEnemy(false);
+            m_WasPointingAtEnemy = m_WeaponsManager.IsPointingAtEnemy;
         }
 
         void UpdateCrosshairPointingAtEnemy(bool force)
@@ -71,9 +95,6 @@ namespace Unity.FPS.UI
                 CrosshairImage.enabled = true;
                 m_CrosshairDataDefault = newWeapon.CrosshairDataDefault;
                 m_CrosshairDataTarget = newWeapon.CrosshairDataTargetInSight;
-                m_CrosshairRectTransform = CrosshairImage.GetComponent<RectTransform>();
-                DebugUtility.HandleErrorIfNullGetComponent<RectTransform, CrosshairManager>(m_CrosshairRectTransform,
-                    this, CrosshairImage.gameObject);
             }
             else
             {

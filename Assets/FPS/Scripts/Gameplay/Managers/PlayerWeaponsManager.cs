@@ -132,6 +132,12 @@ namespace Unity.FPS.Gameplay
             if(!IsOwner)
                 return;
 
+            if (!IsLocalGameplayActive())
+            {
+                IsAiming = false;
+                return;
+            }
+
             // shoot handling
             WeaponController activeWeapon = GetActiveWeapon();
 
@@ -216,6 +222,12 @@ namespace Unity.FPS.Gameplay
             // Set final weapon socket position based on all the combined animation influences
             WeaponParentSocket.localPosition =
                 m_WeaponMainLocalPosition + m_WeaponBobLocalPosition + m_WeaponRecoilLocalPosition;
+        }
+
+        bool IsLocalGameplayActive()
+        {
+            GameFlowManager gameFlowManager = FindFirstObjectByType<GameFlowManager>();
+            return gameFlowManager == null || gameFlowManager.IsGameplayActive;
         }
 
         // Sets the FOV of the main camera and the weapon camera simultaneously
@@ -537,9 +549,63 @@ namespace Unity.FPS.Gameplay
             return false;
         }
 
+        public void ResetLoadout()
+        {
+            for (int i = 0; i < m_WeaponSlots.Length; i++)
+            {
+                WeaponController weapon = m_WeaponSlots[i];
+                if (weapon == null)
+                    continue;
+
+                m_WeaponSlots[i] = null;
+                OnRemovedWeapon?.Invoke(weapon, i);
+                Destroy(weapon.gameObject);
+            }
+
+            ActiveWeaponIndex = -1;
+            m_WeaponSwitchNewWeaponIndex = -1;
+            m_WeaponSwitchState = WeaponSwitchState.Down;
+            m_TimeStartedWeaponSwitch = Time.time;
+            m_WeaponMainLocalPosition = DownWeaponPosition != null ? DownWeaponPosition.localPosition : Vector3.zero;
+            m_WeaponBobLocalPosition = Vector3.zero;
+            m_WeaponRecoilLocalPosition = Vector3.zero;
+            m_AccumulatedRecoil = Vector3.zero;
+
+            if (IsOwner)
+            {
+                m_NetworkActiveWeaponIndex.Value = -1;
+            }
+
+            foreach (var weapon in StartingWeapons)
+            {
+                WeaponController weaponInstance = AddWeaponAndReturnInstance(weapon);
+                if (weaponInstance != null)
+                {
+                    weaponInstance.ResetWeaponState();
+                }
+            }
+
+            SwitchWeapon(true);
+        }
+
         public WeaponController GetActiveWeapon()
         {
             return GetWeaponAtSlotIndex(ActiveWeaponIndex);
+        }
+
+        public bool TryAuthorizeServerShot(int shotIndex, bool consumeShotAmmo, out float validatedDamage)
+        {
+            validatedDamage = 0f;
+
+            int serverActiveWeaponIndex = IsServer && !IsOwner
+                ? m_NetworkActiveWeaponIndex.Value
+                : ActiveWeaponIndex;
+
+            WeaponController activeWeapon = GetWeaponAtSlotIndex(serverActiveWeaponIndex);
+            if (activeWeapon == null)
+                return false;
+
+            return activeWeapon.TryAuthorizeServerShot(shotIndex, consumeShotAmmo, out validatedDamage);
         }
 
         public WeaponController GetWeaponAtSlotIndex(int index)
@@ -552,6 +618,40 @@ namespace Unity.FPS.Gameplay
             }
 
             // if we didn't find a valid active weapon in our weapon slots, return null
+            return null;
+        }
+
+        WeaponController AddWeaponAndReturnInstance(WeaponController weaponPrefab)
+        {
+            if (HasWeapon(weaponPrefab) != null)
+            {
+                return null;
+            }
+
+            for (int i = 0; i < m_WeaponSlots.Length; i++)
+            {
+                if (m_WeaponSlots[i] == null)
+                {
+                    WeaponController weaponInstance = Instantiate(weaponPrefab, WeaponParentSocket);
+                    weaponInstance.transform.localPosition = Vector3.zero;
+                    weaponInstance.transform.localRotation = Quaternion.identity;
+
+                    weaponInstance.Owner = gameObject;
+                    weaponInstance.SourcePrefab = weaponPrefab.gameObject;
+                    weaponInstance.ShowWeapon(false);
+
+                    int layerIndex = Mathf.RoundToInt(Mathf.Log(FpsWeaponLayer.value, 2));
+                    foreach (Transform t in weaponInstance.gameObject.GetComponentsInChildren<Transform>(true))
+                    {
+                        t.gameObject.layer = layerIndex;
+                    }
+
+                    m_WeaponSlots[i] = weaponInstance;
+                    OnAddedWeapon?.Invoke(weaponInstance, i);
+                    return weaponInstance;
+                }
+            }
+
             return null;
         }
 

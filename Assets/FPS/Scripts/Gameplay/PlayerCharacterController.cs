@@ -6,7 +6,7 @@ using UnityEngine.Events;
 namespace Unity.FPS.Gameplay
 {
     [RequireComponent(typeof(CharacterController), typeof(PlayerInputHandler), typeof(AudioSource))]
-    public class PlayerCharacterController : NetworkBehaviour, INetworkShooter, IPlayerController
+    public class PlayerCharacterController : NetworkBehaviour, INetworkShooter, IPlayerController, IMatchRestartHandler
     {
         [Header("References")] [Tooltip("Reference to the main camera used for the player")]
         public Camera PlayerCamera;
@@ -134,17 +134,29 @@ namespace Unity.FPS.Gameplay
 
         const float k_JumpGroundingPreventionTime = 0.2f;
         const float k_GroundCheckDistanceInAir = 0.07f;
+        const float k_MaxValidatedShotDistance = 1000f;
+        const float k_MaxShotOriginDistanceFromPlayer = 4f;
+        const float k_MaxShotDirectionErrorDegrees = 45f;
+        const float k_RemoteTracerDuration = 0.08f;
+        const float k_RemoteImpactDuration = 0.45f;
+        const float k_MaxPickupDistanceFromPlayer = 4f;
+        const float k_PickupSearchRadius = 2f;
 
 
         // Static event — any script can subscribe to this
         public static event System.Action<PlayerCharacterController> OnLocalPlayerSpawned;
+        public static event System.Action OnLocalShotConfirmed;
+        public static event System.Action OnLocalShotBlocked;
+        static Material s_RemoteHitMaterial;
+        static Material s_RemoteMissMaterial;
+        static Material s_RemoteBlockedMaterial;
 
 
         public override void OnNetworkSpawn()
         {
             if (IsOwner)
             {
-                StartCoroutine(TeleportToSpawnPoint());
+                StartCoroutine(InitializeLocalPlayer());
             }
 
             // Register this player as an actor on ALL clients
@@ -156,13 +168,12 @@ namespace Unity.FPS.Gameplay
             {
                 actor.Affiliation = 0; // Player team
                 actorsManager.Actors.Add(actor);
-                Debug.Log($"[Player] Registered as actor. Total: {actorsManager.Actors.Count}");
             }
 
             // SERVER: Register player for kill tracking
             if (IsServer)
             {
-                GameFlowManager gfm = FindObjectOfType<GameFlowManager>();
+                GameFlowManager gfm = FindFirstObjectByType<GameFlowManager>();
                 if (gfm != null)
                 {
                     gfm.RegisterPlayer(OwnerClientId);
@@ -173,28 +184,9 @@ namespace Unity.FPS.Gameplay
         }
 
 
-        System.Collections.IEnumerator TeleportToSpawnPoint()
+        System.Collections.IEnumerator InitializeLocalPlayer()
         {
-            // Wait one frame for scene to fully load
             yield return null;
-
-            var spawnPoints = FindObjectsByType<PlayerSpawnPoint>(FindObjectsSortMode.None);
-            Debug.Log($"[Player] SpawnPoints found: {spawnPoints.Length}");
-
-            if (spawnPoints.Length > 0)
-            {
-                Transform point = spawnPoints[Random.Range(0, spawnPoints.Length)].transform;
-
-                CharacterController cc = GetComponent<CharacterController>();
-                if (cc != null) cc.enabled = false;
-
-                transform.position = point.position;
-                transform.rotation = point.rotation;
-
-                if (cc != null) cc.enabled = true;
-
-                Debug.Log($"[Player] Spawned at: {transform.position}");
-            }
 
             OnLocalPlayerSpawned?.Invoke(this);
         }
@@ -227,8 +219,10 @@ namespace Unity.FPS.Gameplay
             }
         }
 
-        void OnDestroy()
+        public override void OnDestroy()
         {
+            base.OnDestroy();
+
             if (m_Health != null)
             {
                 m_Health.OnDie -= OnDie;
@@ -239,9 +233,17 @@ namespace Unity.FPS.Gameplay
         {
 
             if (!IsOwner) return;
-            Debug.Log($"[Player] Update. m_IsDead: {m_IsDead}");
 
             if (m_IsDead) return;  // Can't move or shoot while dead
+
+            if (!IsLocalGameplayActive())
+            {
+                CharacterVelocity = Vector3.zero;
+                HasJumpedThisFrame = false;
+                GroundCheck();
+                UpdateCharacterHeight(false);
+                return;
+            }
 
             // ... rest of your existing Update code
 
@@ -301,8 +303,6 @@ namespace Unity.FPS.Gameplay
 
         void OnDie()
         {
-
-            Debug.Log($"[Player] OnDie called. IsOwner: {IsOwner}");
             if (!IsOwner) return;
 
             // Disable player input and movement
@@ -328,6 +328,41 @@ namespace Unity.FPS.Gameplay
             if (weaponsManager != null)
             {
                 weaponsManager.enabled = true;
+            }
+        }
+
+        public void ResetForMatchRestart()
+        {
+            if (!IsServer)
+                return;
+
+            ResetRoundLocalState();
+            ResetForMatchRestartClientRpc();
+        }
+
+        [ClientRpc]
+        void ResetForMatchRestartClientRpc()
+        {
+            if (IsServer)
+                return;
+
+            ResetRoundLocalState();
+        }
+
+        void ResetRoundLocalState()
+        {
+            m_IsDead = false;
+
+            if (m_WeaponsManager != null)
+            {
+                m_WeaponsManager.enabled = true;
+                m_WeaponsManager.ResetLoadout();
+            }
+
+            Jetpack jetpack = GetComponent<Jetpack>();
+            if (jetpack != null)
+            {
+                jetpack.ResetJetpack();
             }
         }
 
@@ -548,32 +583,267 @@ namespace Unity.FPS.Gameplay
             return true;
         }
 
-        public void RequestShoot(Vector3 origin, Vector3 direction)
+        public void RequestShoot(Vector3 origin, Vector3 direction, int shotIndex)
         {
-            RequestShootServerRpc( origin,  direction);
+            RequestShootServerRpc(origin, direction.normalized, shotIndex);
+        }
+
+        public void RequestPickup(Pickup pickup)
+        {
+            if (pickup == null || m_IsDead)
+                return;
+
+            if (IsServer)
+            {
+                TryApplyPickupOnServer(pickup);
+            }
+            else if (IsOwner)
+            {
+                RequestPickupServerRpc(pickup.transform.position);
+            }
         }
 
         [ServerRpc]
-        void RequestShootServerRpc(Vector3 origin, Vector3 direction)
+        void RequestPickupServerRpc(Vector3 pickupPosition)
         {
-            if (Physics.Raycast(origin, direction, out RaycastHit hit, 1000f, -1,
-                QueryTriggerInteraction.Ignore))
+            if (m_IsDead || !IsServerGameplayActive())
+                return;
+
+            if (Vector3.Distance(transform.position, pickupPosition) >
+                k_MaxPickupDistanceFromPlayer + k_PickupSearchRadius)
             {
-                Health targetHealth = hit.collider.GetComponentInParent<Health>();
-                if (targetHealth != null)
-                {
-                    targetHealth.TakeDamage(10f, gameObject);
-                }
+                return;
             }
 
-            ShootVisualClientRpc(origin, direction);
+            Pickup pickup = Pickup.FindClosestAvailable(pickupPosition, k_PickupSearchRadius);
+            TryApplyPickupOnServer(pickup);
+        }
+
+        void TryApplyPickupOnServer(Pickup pickup)
+        {
+            if (!IsServer || pickup == null)
+                return;
+
+            if (!IsServerGameplayActive())
+                return;
+
+            if (Vector3.Distance(transform.position, pickup.transform.position) > k_MaxPickupDistanceFromPlayer)
+                return;
+
+            pickup.TryApplyServerPickup(this);
+        }
+
+        public void ResolvePickupOnClients(Vector3 pickupPosition)
+        {
+            if (!IsServer)
+                return;
+
+            ResolvePickupClientRpc(pickupPosition);
         }
 
         [ClientRpc]
-        void ShootVisualClientRpc(Vector3 origin, Vector3 direction)
+        void ResolvePickupClientRpc(Vector3 pickupPosition)
+        {
+            Pickup pickup = Pickup.FindClosestAvailable(pickupPosition, k_PickupSearchRadius);
+            if (pickup == null)
+                return;
+
+            if (IsOwner && !IsServer)
+            {
+                pickup.TryApplyClientConfirmedPickup(this);
+            }
+            else
+            {
+                pickup.ConsumeLocally(true, false);
+            }
+        }
+
+        [ServerRpc]
+        void RequestShootServerRpc(Vector3 origin, Vector3 direction, int shotIndex)
+        {
+            if (!IsServer || m_IsDead || !IsServerGameplayActive())
+            {
+                return;
+            }
+
+            bool consumeShotAmmo = !(IsServer && IsOwner);
+            if (m_WeaponsManager == null ||
+                !m_WeaponsManager.TryAuthorizeServerShot(shotIndex, consumeShotAmmo, out float validatedDamage))
+            {
+                return;
+            }
+
+            if (Vector3.Distance(origin, transform.position) > k_MaxShotOriginDistanceFromPlayer)
+            {
+                return;
+            }
+
+            Vector3 flatForward = Vector3.ProjectOnPlane(transform.forward, Vector3.up).normalized;
+            Vector3 flatDirection = Vector3.ProjectOnPlane(direction, Vector3.up).normalized;
+            if (flatDirection.sqrMagnitude > 0.001f &&
+                Vector3.Angle(flatForward, flatDirection) > k_MaxShotDirectionErrorDegrees)
+            {
+                return;
+            }
+
+            Vector3 shotEnd = origin + direction * k_MaxValidatedShotDistance;
+            Vector3 shotNormal = -direction;
+            bool didHit = false;
+            bool hitDamageable = false;
+            bool hitBlockedDamageable = false;
+
+            if (Physics.Raycast(origin, direction, out RaycastHit hit, k_MaxValidatedShotDistance, -1,
+                QueryTriggerInteraction.Ignore))
+            {
+                shotEnd = hit.point;
+                shotNormal = hit.normal;
+                didHit = true;
+
+                Damageable damageable = hit.collider.GetComponentInParent<Damageable>();
+                if (damageable != null && damageable.Health != null && damageable.Health != m_Health)
+                {
+                    if (damageable.Health.CanTakeDamage)
+                    {
+                        damageable.InflictDamage(validatedDamage, false, gameObject);
+                        hitDamageable = true;
+                        ConfirmShotClientRpc(new ClientRpcParams
+                        {
+                            Send = new ClientRpcSendParams
+                            {
+                                TargetClientIds = new ulong[] { OwnerClientId }
+                            }
+                        });
+                    }
+                    else
+                    {
+                        hitBlockedDamageable = true;
+                        BlockShotClientRpc(new ClientRpcParams
+                        {
+                            Send = new ClientRpcSendParams
+                            {
+                                TargetClientIds = new ulong[] { OwnerClientId }
+                            }
+                        });
+                    }
+                }
+            }
+
+            ShootVisualClientRpc(origin, shotEnd, shotNormal, didHit, hitDamageable, hitBlockedDamageable);
+        }
+
+        bool IsServerGameplayActive()
+        {
+            GameFlowManager gameFlowManager = FindFirstObjectByType<GameFlowManager>();
+            return gameFlowManager == null ||
+                   gameFlowManager.IsGameplayActive;
+        }
+
+        bool IsLocalGameplayActive()
+        {
+            GameFlowManager gameFlowManager = FindFirstObjectByType<GameFlowManager>();
+            return gameFlowManager == null ||
+                   gameFlowManager.IsGameplayActive;
+        }
+
+        [ClientRpc]
+        void ConfirmShotClientRpc(ClientRpcParams clientRpcParams = default)
+        {
+            if (IsOwner)
+            {
+                OnLocalShotConfirmed?.Invoke();
+            }
+        }
+
+        [ClientRpc]
+        void BlockShotClientRpc(ClientRpcParams clientRpcParams = default)
+        {
+            if (IsOwner)
+            {
+                OnLocalShotBlocked?.Invoke();
+            }
+        }
+
+        [ClientRpc]
+        void ShootVisualClientRpc(Vector3 origin, Vector3 endPoint, Vector3 hitNormal, bool didHit,
+            bool hitDamageable, bool hitBlockedDamageable)
         {
             if (IsOwner) return;
-            // Remote shot visuals
+
+            CreateRemoteTracer(origin, endPoint, hitDamageable, hitBlockedDamageable);
+
+            if (didHit)
+            {
+                CreateRemoteImpact(endPoint, hitNormal, hitDamageable, hitBlockedDamageable);
+            }
+        }
+
+        void CreateRemoteTracer(Vector3 origin, Vector3 endPoint, bool hitDamageable, bool hitBlockedDamageable)
+        {
+            GameObject tracer = new GameObject("RemoteShotTracer");
+            LineRenderer line = tracer.AddComponent<LineRenderer>();
+            line.positionCount = 2;
+            line.SetPosition(0, origin);
+            line.SetPosition(1, endPoint);
+            line.useWorldSpace = true;
+            line.widthMultiplier = hitDamageable ? 0.035f : hitBlockedDamageable ? 0.03f : 0.02f;
+            line.material = GetRemoteShotMaterial(hitDamageable, hitBlockedDamageable);
+            line.numCapVertices = 2;
+            Destroy(tracer, k_RemoteTracerDuration);
+        }
+
+        void CreateRemoteImpact(Vector3 point, Vector3 normal, bool hitDamageable, bool hitBlockedDamageable)
+        {
+            GameObject impact = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            impact.name = hitDamageable ? "RemoteHitImpact" : hitBlockedDamageable ? "RemoteBlockedImpact" : "RemoteImpact";
+            impact.transform.position = point + normal.normalized * 0.025f;
+            impact.transform.localScale = Vector3.one * (hitDamageable ? 0.16f : hitBlockedDamageable ? 0.13f : 0.09f);
+
+            Collider impactCollider = impact.GetComponent<Collider>();
+            if (impactCollider != null)
+            {
+                Destroy(impactCollider);
+            }
+
+            Renderer renderer = impact.GetComponent<Renderer>();
+            if (renderer != null)
+            {
+                renderer.material = GetRemoteShotMaterial(hitDamageable, hitBlockedDamageable);
+            }
+
+            Destroy(impact, k_RemoteImpactDuration);
+        }
+
+        static Material GetRemoteShotMaterial(bool hitDamageable, bool hitBlockedDamageable)
+        {
+            if (hitDamageable)
+            {
+                if (s_RemoteHitMaterial == null)
+                {
+                    s_RemoteHitMaterial = new Material(Shader.Find("Sprites/Default"));
+                    s_RemoteHitMaterial.color = new Color(1f, 0.25f, 0.18f, 0.95f);
+                }
+
+                return s_RemoteHitMaterial;
+            }
+
+            if (hitBlockedDamageable)
+            {
+                if (s_RemoteBlockedMaterial == null)
+                {
+                    s_RemoteBlockedMaterial = new Material(Shader.Find("Sprites/Default"));
+                    s_RemoteBlockedMaterial.color = new Color(0.2f, 0.55f, 1f, 0.9f);
+                }
+
+                return s_RemoteBlockedMaterial;
+            }
+
+            if (s_RemoteMissMaterial == null)
+            {
+                s_RemoteMissMaterial = new Material(Shader.Find("Sprites/Default"));
+                s_RemoteMissMaterial.color = new Color(0.35f, 0.8f, 1f, 0.75f);
+            }
+
+            return s_RemoteMissMaterial;
         }
     }
 }

@@ -145,10 +145,30 @@ namespace Unity.FPS.Gameplay
             if (IsJetpackUnlocked)
                 return false;
 
-            OnUnlockJetpack.Invoke(true);
+            OnUnlockJetpack?.Invoke(true);
             IsJetpackUnlocked = true;
             m_LastTimeOfUse = Time.time;
             return true;
+        }
+
+        public void ResetJetpack()
+        {
+            IsJetpackUnlocked = IsJetpackUnlockedAtStart;
+            CurrentFillRatio = 1f;
+            m_CanUseJetpack = false;
+            m_LastTimeOfUse = Time.time;
+            OnUnlockJetpack?.Invoke(IsJetpackUnlocked);
+
+            if (AudioSource != null && AudioSource.isPlaying)
+            {
+                AudioSource.Stop();
+            }
+
+            for (int i = 0; i < JetpackVfx.Length; i++)
+            {
+                var emissionModulesVfx = JetpackVfx[i].emission;
+                emissionModulesVfx.enabled = false;
+            }
         }
     }
 }

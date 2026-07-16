@@ -16,24 +16,64 @@ namespace Unity.FPS.UI
         PlayerWeaponsManager m_PlayerWeaponsManager;
         List<AmmoCounter> m_AmmoCounters = new List<AmmoCounter>();
 
-        void Start()
+        void Awake()
         {
-            //TODO MULTIPLAYER CONVERSION: This will need to be changed to get the local player character controller instead of just finding one in the scene
+            PlayerCharacterController.OnLocalPlayerSpawned += OnLocalPlayerSpawned;
+        }
 
-            //m_PlayerWeaponsManager = FindObjectOfType<PlayerWeaponsManager>();
-            //DebugUtility.HandleErrorIfNullFindObject<PlayerWeaponsManager, WeaponHUDManager>(m_PlayerWeaponsManager,
-            //    this);
+        void OnDestroy()
+        {
+            PlayerCharacterController.OnLocalPlayerSpawned -= OnLocalPlayerSpawned;
+            UnbindWeaponsManager();
+        }
 
-            //WeaponController activeWeapon = m_PlayerWeaponsManager.GetActiveWeapon();
-            //if (activeWeapon)
-            //{
-            //    AddWeapon(activeWeapon, m_PlayerWeaponsManager.ActiveWeaponIndex);
-            //    ChangeWeapon(activeWeapon);
-            //}
+        void OnLocalPlayerSpawned(PlayerCharacterController player)
+        {
+            UnbindWeaponsManager();
 
-            //m_PlayerWeaponsManager.OnAddedWeapon += AddWeapon;
-            //m_PlayerWeaponsManager.OnRemovedWeapon += RemoveWeapon;
-            //m_PlayerWeaponsManager.OnSwitchedToWeapon += ChangeWeapon;
+            m_PlayerWeaponsManager = player.GetComponent<PlayerWeaponsManager>();
+            DebugUtility.HandleErrorIfNullGetComponent<PlayerWeaponsManager, WeaponHUDManager>(m_PlayerWeaponsManager,
+                this, player.gameObject);
+
+            for (int i = 0; i < 9; i++)
+            {
+                WeaponController weapon = m_PlayerWeaponsManager.GetWeaponAtSlotIndex(i);
+                if (weapon != null)
+                {
+                    AddWeapon(weapon, i);
+                }
+            }
+
+            WeaponController activeWeapon = m_PlayerWeaponsManager.GetActiveWeapon();
+            if (activeWeapon)
+            {
+                ChangeWeapon(activeWeapon);
+            }
+
+            m_PlayerWeaponsManager.OnAddedWeapon += AddWeapon;
+            m_PlayerWeaponsManager.OnRemovedWeapon += RemoveWeapon;
+            m_PlayerWeaponsManager.OnSwitchedToWeapon += ChangeWeapon;
+        }
+
+        void UnbindWeaponsManager()
+        {
+            if (m_PlayerWeaponsManager != null)
+            {
+                m_PlayerWeaponsManager.OnAddedWeapon -= AddWeapon;
+                m_PlayerWeaponsManager.OnRemovedWeapon -= RemoveWeapon;
+                m_PlayerWeaponsManager.OnSwitchedToWeapon -= ChangeWeapon;
+                m_PlayerWeaponsManager = null;
+            }
+
+            foreach (AmmoCounter counter in m_AmmoCounters)
+            {
+                if (counter != null)
+                {
+                    Destroy(counter.gameObject);
+                }
+            }
+
+            m_AmmoCounters.Clear();
         }
 
         void AddWeapon(WeaponController newWeapon, int weaponIndex)
@@ -43,7 +83,7 @@ namespace Unity.FPS.UI
             DebugUtility.HandleErrorIfNullGetComponent<AmmoCounter, WeaponHUDManager>(newAmmoCounter, this,
                 ammoCounterInstance.gameObject);
 
-            newAmmoCounter.Initialize(newWeapon, weaponIndex);
+            newAmmoCounter.Initialize(newWeapon, weaponIndex, m_PlayerWeaponsManager);
 
             m_AmmoCounters.Add(newAmmoCounter);
         }

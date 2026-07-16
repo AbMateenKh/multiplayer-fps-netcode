@@ -8,15 +8,20 @@ namespace Unity.FPS.Gameplay
         [Header("Parameters")] [Tooltip("Amount of health to heal on pickup")]
         public float HealAmount;
 
-        protected override void OnPicked(PlayerCharacterController player)
+        protected override bool ApplyPickupEffect(PlayerCharacterController player, bool serverAuthoritative)
         {
             Health playerHealth = player.GetComponent<Health>();
             if (playerHealth && playerHealth.CanPickup())
             {
-                playerHealth.Heal(HealAmount);
-                PlayPickupFeedback();
-                Destroy(gameObject);
+                if (serverAuthoritative)
+                {
+                    playerHealth.Heal(HealAmount);
+                }
+
+                return true;
             }
+
+            return false;
         }
     }
 }

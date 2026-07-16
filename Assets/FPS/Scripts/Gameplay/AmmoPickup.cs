@@ -11,7 +11,7 @@ namespace Unity.FPS.Gameplay
         [Tooltip("Number of bullets the player gets")]
         public int BulletCount = 30;
 
-        protected override void OnPicked(PlayerCharacterController byPlayer)
+        protected override bool ApplyPickupEffect(PlayerCharacterController byPlayer, bool serverAuthoritative)
         {
             PlayerWeaponsManager playerWeaponsManager = byPlayer.GetComponent<PlayerWeaponsManager>();
             if (playerWeaponsManager)
@@ -25,10 +25,11 @@ namespace Unity.FPS.Gameplay
                     evt.Weapon = weapon;
                     EventManager.Broadcast(evt);
 
-                    PlayPickupFeedback();
-                    Destroy(gameObject);
+                    return true;
                 }
             }
+
+            return false;
         }
     }
 }

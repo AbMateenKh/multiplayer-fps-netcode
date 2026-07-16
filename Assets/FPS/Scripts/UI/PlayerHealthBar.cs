@@ -29,6 +29,11 @@ namespace Unity.FPS.UI
 
         void OnLocalPlayerSpawned(PlayerCharacterController player)
         {
+            if (m_PlayerHealth != null)
+            {
+                m_PlayerHealth.CurrentHealth.OnValueChanged -= OnHealthChanged;
+            }
+
             m_PlayerHealth = player.GetComponent<Health>();
 
             // Subscribe to NetworkVariable changes instead of polling in Update

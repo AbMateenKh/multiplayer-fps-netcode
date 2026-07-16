@@ -13,6 +13,9 @@ namespace Unity.FPS.Game
         [Tooltip("Health ratio at which the critical health vignette starts appearing")]
         public float CriticalHealthRatio = 0.3f;
 
+        [Tooltip("Seconds of damage immunity after spawning or respawning")]
+        public float RespawnProtectionDuration = 2f;
+
         public UnityAction<float, GameObject> OnDamaged;
         public UnityAction<float> OnHealed;
         public UnityAction OnDie;
@@ -23,37 +26,92 @@ namespace Unity.FPS.Game
             NetworkVariableWritePermission.Server
         );
 
+        public NetworkVariable<float> RespawnProtectionTimer = new NetworkVariable<float>(
+            0f,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Server
+        );
+
         public bool Invincible { get; set; }
+        public bool IsRespawnProtected => RespawnProtectionTimer.Value > 0f;
+        public bool CanTakeDamage => !Invincible && !IsRespawnProtected && CurrentHealth.Value > 0f;
         public bool CanPickup() => CurrentHealth.Value < MaxHealth;
         public float GetRatio() => CurrentHealth.Value / MaxHealth;
         public bool IsCritical() => GetRatio() <= CriticalHealthRatio;
 
         bool m_IsDead;
+        bool m_IsSubscribedToHealthChanges;
 
         // NEW: Track who last dealt damage (server only)
         GameObject m_LastDamageSource;
+
+        void Awake()
+        {
+            SubscribeToHealthChanges();
+        }
 
         public override void OnNetworkSpawn()
         {
             if (IsServer)
             {
                 CurrentHealth.Value = MaxHealth;
+                if (CanUseRespawnProtection())
+                {
+                    StartRespawnProtection();
+                }
             }
 
-            CurrentHealth.OnValueChanged += OnHealthChanged;
+            SubscribeToHealthChanges();
+        }
+
+        void Update()
+        {
+            if (!IsServer || RespawnProtectionTimer.Value <= 0f)
+                return;
+
+            RespawnProtectionTimer.Value = Mathf.Max(0f, RespawnProtectionTimer.Value - Time.deltaTime);
         }
 
         public override void OnNetworkDespawn()
         {
+            UnsubscribeFromHealthChanges();
+        }
+
+        public override void OnDestroy()
+        {
+            base.OnDestroy();
+            UnsubscribeFromHealthChanges();
+        }
+
+        void SubscribeToHealthChanges()
+        {
+            if (m_IsSubscribedToHealthChanges)
+                return;
+
+            CurrentHealth.OnValueChanged += OnHealthChanged;
+            m_IsSubscribedToHealthChanges = true;
+        }
+
+        void UnsubscribeFromHealthChanges()
+        {
+            if (!m_IsSubscribedToHealthChanges)
+                return;
+
             CurrentHealth.OnValueChanged -= OnHealthChanged;
+            m_IsSubscribedToHealthChanges = false;
         }
 
         void OnHealthChanged(float previousValue, float newValue)
         {
+            NotifyHealthChanged(previousValue, newValue, null);
+        }
+
+        void NotifyHealthChanged(float previousValue, float newValue, GameObject damageSource)
+        {
             if (newValue < previousValue)
             {
                 float damageAmount = previousValue - newValue;
-                OnDamaged?.Invoke(damageAmount, null);
+                OnDamaged?.Invoke(damageAmount, damageSource);
             }
             else if (newValue > previousValue)
             {
@@ -89,23 +147,35 @@ namespace Unity.FPS.Game
 
         public void TakeDamage(float damage, GameObject damageSource)
         {
-            if (IsServer)
+            if (IsServer || !IsSpawned)
             {
-                if (Invincible) return;
+                if (!CanTakeDamage) return;
 
                 m_LastDamageSource = damageSource;
 
+                float previousHealth = CurrentHealth.Value;
                 float newHealth = Mathf.Clamp(CurrentHealth.Value - damage, 0f, MaxHealth);
+                bool shouldNotifyManually = !IsSpawned ||
+                    NetworkManager.Singleton == null ||
+                    !NetworkManager.Singleton.IsListening;
 
                 // Check death BEFORE setting NetworkVariable
                 if (newHealth <= 0f && !m_IsDead)
                 {
                     CurrentHealth.Value = newHealth;
+                    if (shouldNotifyManually)
+                    {
+                        NotifyHealthChanged(previousHealth, newHealth, damageSource);
+                    }
                     ProcessDeath();
                 }
                 else
                 {
                     CurrentHealth.Value = newHealth;
+                    if (shouldNotifyManually)
+                    {
+                        NotifyHealthChanged(previousHealth, newHealth, damageSource);
+                    }
                 }
             }
             else
@@ -116,11 +186,7 @@ namespace Unity.FPS.Game
 
         void ProcessDeath()
         {
-
-            Debug.Log($"[Health] ProcessDeath ENTRY. m_IsDead: {m_IsDead}");
             if (m_IsDead) return;
-            Debug.Log($"[Health] ProcessDeath PASSED m_IsDead check");
-            
 
             m_IsDead = true;
             Invincible = true;
@@ -144,7 +210,6 @@ namespace Unity.FPS.Game
                         }
                     }
 
-                    Debug.Log($"[Health] Recording kill. Victim: {victimId}, Killer: {killerId}");
                     gfm.RecordKill(victimId, killerId);
                     gfm.RequestRespawn(victimId);
                 }
@@ -183,15 +248,38 @@ namespace Unity.FPS.Game
         // ============================================
         public void Respawn()
         {
-            if (!IsServer) return;
+            Revive(true);
+        }
+
+        public void Revive(bool useRespawnProtection)
+        {
+            if (!IsServer && IsSpawned) return;
 
             m_IsDead = false;
             Invincible = false;
             m_LastDamageSource = null;
             CurrentHealth.Value = MaxHealth;
+            RespawnProtectionTimer.Value = 0f;
+            if (useRespawnProtection)
+            {
+                StartRespawnProtection();
+            }
 
             // Tell clients to reset death state
-            RespawnClientRpc();
+            if (IsSpawned)
+            {
+                RespawnClientRpc();
+            }
+        }
+
+        void StartRespawnProtection()
+        {
+            RespawnProtectionTimer.Value = Mathf.Max(0f, RespawnProtectionDuration);
+        }
+
+        bool CanUseRespawnProtection()
+        {
+            return GetComponent<IPlayerController>() != null;
         }
 
         [ClientRpc]
@@ -207,46 +295,5 @@ namespace Unity.FPS.Game
             }
         }
 
-        // ============================================
-        // DEATH — Server handles kill tracking + respawn
-        // ============================================
-        void HandleDeath()
-        {
-            //if (m_IsDead) return;
-
-            //if (CurrentHealth.Value <= 0f)
-            //{
-            //    m_IsDead = true;
-            //    Invincible = true;
-
-            //    // DON'T call OnDie here — OnHealthChanged already fires it on all clients
-            //    // OnDie?.Invoke();  ← REMOVE THIS
-
-            //    // Server-only: record kill and respawn
-            //    IPlayerController playerController = GetComponent<IPlayerController>();
-            //    if (playerController != null)
-            //    {
-            //        GameFlowManager gfm = FindObjectOfType<GameFlowManager>();
-            //        if (gfm != null)
-            //        {
-            //            ulong victimId = GetComponent<NetworkObject>().OwnerClientId;
-
-            //            ulong killerId = victimId;
-            //            if (m_LastDamageSource != null)
-            //            {
-            //                NetworkObject killerNetObj =
-            //                    m_LastDamageSource.GetComponent<NetworkObject>();
-            //                if (killerNetObj != null)
-            //                {
-            //                    killerId = killerNetObj.OwnerClientId;
-            //                }
-            //            }
-
-            //            gfm.RecordKill(victimId, killerId);
-            //            gfm.RequestRespawn(victimId);
-            //        }
-            //    }
-            //}
-        }
     }
 }

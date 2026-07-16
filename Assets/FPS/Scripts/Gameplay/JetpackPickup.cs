@@ -2,17 +2,13 @@
 {
     public class JetpackPickup : Pickup
     {
-        protected override void OnPicked(PlayerCharacterController byPlayer)
+        protected override bool ApplyPickupEffect(PlayerCharacterController byPlayer, bool serverAuthoritative)
         {
             var jetpack = byPlayer.GetComponent<Jetpack>();
             if (!jetpack)
-                return;
+                return false;
 
-            if (jetpack.TryUnlock())
-            {
-                PlayPickupFeedback();
-                Destroy(gameObject);
-            }
+            return jetpack.TryUnlock();
         }
     }
 }
