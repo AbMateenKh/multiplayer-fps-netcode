@@ -131,6 +131,11 @@ namespace Unity.FPS.Game
             {
                 PrepareRoundCountdown();
                 IsMatchOver.Value = false;
+                if (NetworkManager.Singleton != null)
+                {
+                    NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
+                }
+
                 RefreshSoloTargetDummies();
             }
 
@@ -276,6 +281,14 @@ namespace Unity.FPS.Game
             }
 
             RefreshSoloTargetDummies();
+        }
+
+        void OnClientDisconnected(ulong clientId)
+        {
+            if (!IsServer)
+                return;
+
+            UnregisterPlayer(clientId);
         }
 
        
@@ -809,6 +822,10 @@ namespace Unity.FPS.Game
         public override void OnNetworkDespawn()
         {
             IsMatchOver.OnValueChanged -= OnMatchOverChanged;
+            if (IsServer && NetworkManager.Singleton != null)
+            {
+                NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnected;
+            }
         }
 
 

@@ -1105,11 +1105,27 @@ public class ScoreboardUI : MonoBehaviour
 
     void OnBackToMenu()
     {
-        // Disconnect and return to menu
+        SetHelpOverlayVisible(false);
+        HideDeathOverlay();
+        m_MatchEndShown = false;
+
+        if (m_ScoreboardPanel != null)
+            m_ScoreboardPanel.SetActive(false);
+
+        if (m_MatchEndPanel != null)
+            m_MatchEndPanel.SetActive(false);
+
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+
         if (NetworkManager.Singleton != null)
         {
-            NetworkManager.Singleton.Shutdown();
+            if (NetworkManager.Singleton.IsListening)
+            {
+                NetworkManager.Singleton.Shutdown();
+            }
         }
+
         UnityEngine.SceneManagement.SceneManager.LoadScene("IntroMenu");
     }
 

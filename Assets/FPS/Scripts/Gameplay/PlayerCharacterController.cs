@@ -102,7 +102,7 @@ namespace Unity.FPS.Gameplay
         public Vector3 CharacterVelocity { get; set; }
         public bool IsGrounded { get; private set; }
         public bool HasJumpedThisFrame { get; private set; }
-        public bool IsDead { get; private set; }
+        public bool IsDead => IsDeadOrUnableToAct();
         public bool IsCrouching { get; private set; }
 
         bool m_IsDead;
@@ -234,7 +234,12 @@ namespace Unity.FPS.Gameplay
 
             if (!IsOwner) return;
 
-            if (m_IsDead) return;  // Can't move or shoot while dead
+            if (IsDeadOrUnableToAct())
+            {
+                CharacterVelocity = Vector3.zero;
+                HasJumpedThisFrame = false;
+                return;
+            }
 
             if (!IsLocalGameplayActive())
             {
@@ -303,10 +308,11 @@ namespace Unity.FPS.Gameplay
 
         void OnDie()
         {
-            if (!IsOwner) return;
-
-            // Disable player input and movement
             m_IsDead = true;
+            CharacterVelocity = Vector3.zero;
+            HasJumpedThisFrame = false;
+
+            if (!IsOwner) return;
 
             // Disable weapon visuals
             PlayerWeaponsManager weaponsManager = GetComponent<PlayerWeaponsManager>();
@@ -318,10 +324,9 @@ namespace Unity.FPS.Gameplay
 
         public void OnRespawn()
         {
-            if (!IsOwner) return;
-
-         
             m_IsDead = false;
+
+            if (!IsOwner) return;
 
             // Re-enable weapons
             PlayerWeaponsManager weaponsManager = GetComponent<PlayerWeaponsManager>();
@@ -585,12 +590,15 @@ namespace Unity.FPS.Gameplay
 
         public void RequestShoot(Vector3 origin, Vector3 direction, int shotIndex)
         {
+            if (IsDeadOrUnableToAct() || !IsLocalGameplayActive())
+                return;
+
             RequestShootServerRpc(origin, direction.normalized, shotIndex);
         }
 
         public void RequestPickup(Pickup pickup)
         {
-            if (pickup == null || m_IsDead)
+            if (pickup == null || IsDeadOrUnableToAct() || !IsLocalGameplayActive())
                 return;
 
             if (IsServer)
@@ -606,7 +614,7 @@ namespace Unity.FPS.Gameplay
         [ServerRpc]
         void RequestPickupServerRpc(Vector3 pickupPosition)
         {
-            if (m_IsDead || !IsServerGameplayActive())
+            if (IsDeadOrUnableToAct() || !IsServerGameplayActive())
                 return;
 
             if (Vector3.Distance(transform.position, pickupPosition) >
@@ -624,7 +632,7 @@ namespace Unity.FPS.Gameplay
             if (!IsServer || pickup == null)
                 return;
 
-            if (!IsServerGameplayActive())
+            if (IsDeadOrUnableToAct() || !IsServerGameplayActive())
                 return;
 
             if (Vector3.Distance(transform.position, pickup.transform.position) > k_MaxPickupDistanceFromPlayer)
@@ -661,7 +669,7 @@ namespace Unity.FPS.Gameplay
         [ServerRpc]
         void RequestShootServerRpc(Vector3 origin, Vector3 direction, int shotIndex)
         {
-            if (!IsServer || m_IsDead || !IsServerGameplayActive())
+            if (!IsServer || IsDeadOrUnableToAct() || !IsServerGameplayActive())
             {
                 return;
             }
@@ -736,6 +744,11 @@ namespace Unity.FPS.Gameplay
             GameFlowManager gameFlowManager = FindFirstObjectByType<GameFlowManager>();
             return gameFlowManager == null ||
                    gameFlowManager.IsGameplayActive;
+        }
+
+        bool IsDeadOrUnableToAct()
+        {
+            return m_IsDead || (m_Health != null && m_Health.CurrentHealth.Value <= 0f);
         }
 
         bool IsLocalGameplayActive()
