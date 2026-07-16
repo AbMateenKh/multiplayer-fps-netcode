@@ -826,6 +826,7 @@ namespace Unity.FPS.Game
         Health m_Health;
         Renderer[] m_Renderers;
         Collider[] m_Colliders;
+        TextMesh m_Label;
         Coroutine m_RespawnRoutine;
 
         void Awake()
@@ -833,6 +834,7 @@ namespace Unity.FPS.Game
             m_Health = GetComponent<Health>();
             m_Renderers = GetComponentsInChildren<Renderer>();
             m_Colliders = GetComponentsInChildren<Collider>();
+            CreateLabel();
         }
 
         void OnEnable()
@@ -849,6 +851,7 @@ namespace Unity.FPS.Game
             m_Health.Revive(false);
             SetTargetActive(true);
             SetColor(AliveColor);
+            SetLabel("TARGET", AliveColor);
         }
 
         void OnDisable()
@@ -863,6 +866,7 @@ namespace Unity.FPS.Game
         void OnDamaged(float damage, GameObject damageSource)
         {
             SetColor(DamagedColor);
+            SetLabel("HIT", DamagedColor);
             CancelInvoke(nameof(RestoreAliveColor));
             Invoke(nameof(RestoreAliveColor), 0.12f);
         }
@@ -872,6 +876,7 @@ namespace Unity.FPS.Game
             if (m_Health != null && m_Health.CurrentHealth.Value > 0f)
             {
                 SetColor(AliveColor);
+                SetLabel("TARGET", AliveColor);
             }
         }
 
@@ -888,6 +893,7 @@ namespace Unity.FPS.Game
         IEnumerator RespawnAfterDelay()
         {
             SetColor(DownColor);
+            SetLabel("DOWN", DownColor);
             SetTargetActive(false);
 
             yield return new WaitForSeconds(RespawnDelay);
@@ -895,7 +901,20 @@ namespace Unity.FPS.Game
             m_Health.Revive(false);
             SetTargetActive(true);
             SetColor(AliveColor);
+            SetLabel("TARGET", AliveColor);
             m_RespawnRoutine = null;
+        }
+
+        void LateUpdate()
+        {
+            if (m_Label == null || Camera.main == null)
+                return;
+
+            Vector3 lookDirection = m_Label.transform.position - Camera.main.transform.position;
+            if (lookDirection.sqrMagnitude > 0.001f)
+            {
+                m_Label.transform.rotation = Quaternion.LookRotation(lookDirection.normalized, Vector3.up);
+            }
         }
 
         void SetTargetActive(bool active)
@@ -912,6 +931,30 @@ namespace Unity.FPS.Game
             {
                 m_Renderers[i].material.color = color;
             }
+        }
+
+        void CreateLabel()
+        {
+            GameObject labelObject = new GameObject("TargetLabel");
+            labelObject.transform.SetParent(transform, false);
+            labelObject.transform.localPosition = new Vector3(0f, 1.35f, 0f);
+
+            m_Label = labelObject.AddComponent<TextMesh>();
+            m_Label.text = "TARGET";
+            m_Label.anchor = TextAnchor.MiddleCenter;
+            m_Label.alignment = TextAlignment.Center;
+            m_Label.fontSize = 32;
+            m_Label.characterSize = 0.08f;
+            m_Label.color = AliveColor;
+        }
+
+        void SetLabel(string text, Color color)
+        {
+            if (m_Label == null)
+                return;
+
+            m_Label.text = text;
+            m_Label.color = color;
         }
     }
 

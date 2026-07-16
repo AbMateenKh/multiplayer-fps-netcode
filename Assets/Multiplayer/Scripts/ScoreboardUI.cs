@@ -29,6 +29,7 @@ public class ScoreboardUI : MonoBehaviour
     GameObject m_ScoreboardPanel;
     GameObject m_MatchEndPanel;
     GameObject m_DeathPanel;
+    GameObject m_HelpPanel;
     GameObject m_RowsContainer;
     GameObject m_EndRowsContainer;
     TextMeshProUGUI m_TimerText;
@@ -75,6 +76,7 @@ public class ScoreboardUI : MonoBehaviour
         m_ScoreboardPanel.SetActive(false);
         m_MatchEndPanel.SetActive(false);
         m_DeathPanel.SetActive(false);
+        m_HelpPanel.SetActive(false);
         m_HitMarkerText.gameObject.SetActive(false);
         m_KillConfirmText.gameObject.SetActive(false);
         m_ProtectionText.gameObject.SetActive(false);
@@ -107,6 +109,7 @@ public class ScoreboardUI : MonoBehaviour
         UpdatePickupFeedback();
         UpdateCountdown();
         UpdateCombatFeedback();
+        UpdateHelpInput();
 
         // Tab toggle scoreboard (not during match end)
         if (!m_MatchEndShown)
@@ -122,8 +125,11 @@ public class ScoreboardUI : MonoBehaviour
             if (Input.GetKeyUp(KeyCode.Tab))
             {
                 m_ScoreboardPanel.SetActive(false);
-                Cursor.lockState = CursorLockMode.Locked;
-                Cursor.visible = false;
+                if (m_HelpPanel == null || !m_HelpPanel.activeSelf)
+                {
+                    Cursor.lockState = CursorLockMode.Locked;
+                    Cursor.visible = false;
+                }
             }
         }
     }
@@ -144,6 +150,7 @@ public class ScoreboardUI : MonoBehaviour
     {
         m_MatchEndShown = true;
         HideDeathOverlay();
+        SetHelpOverlayVisible(false);
         m_ScoreboardPanel.SetActive(false);
         m_MatchEndPanel.SetActive(true);
 
@@ -309,9 +316,54 @@ public class ScoreboardUI : MonoBehaviour
         m_MatchEndShown = false;
         m_MatchEndPanel.SetActive(false);
         m_ScoreboardPanel.SetActive(false);
+        SetHelpOverlayVisible(false);
 
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
+    }
+
+    void UpdateHelpInput()
+    {
+        if (m_HelpPanel == null)
+            return;
+
+        if (m_MatchEndShown)
+        {
+            if (m_HelpPanel.activeSelf)
+            {
+                SetHelpOverlayVisible(false);
+            }
+
+            return;
+        }
+
+        if (Input.GetKeyDown(KeyCode.F1) || Input.GetKeyDown(KeyCode.H))
+        {
+            SetHelpOverlayVisible(!m_HelpPanel.activeSelf);
+        }
+        else if (Input.GetKeyDown(KeyCode.Escape) && m_HelpPanel.activeSelf)
+        {
+            SetHelpOverlayVisible(false);
+        }
+    }
+
+    void SetHelpOverlayVisible(bool visible)
+    {
+        if (m_HelpPanel == null)
+            return;
+
+        m_HelpPanel.SetActive(visible);
+
+        if (visible)
+        {
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+        }
+        else if (!m_MatchEndShown && (m_ScoreboardPanel == null || !m_ScoreboardPanel.activeSelf))
+        {
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+        }
     }
 
     void UpdateTimer()
@@ -532,10 +584,31 @@ public class ScoreboardUI : MonoBehaviour
 
         if (m_GameFlowManager.CurrentMatchEndReason == MatchEndReason.TimeExpired)
         {
-            return $"Most kills when time expired ({winnerKills})";
+            int tiedKillLeaders = CountPlayersWithKills(winnerKills);
+            return tiedKillLeaders > 1
+                ? "Time expired: kills tied, fewer deaths wins"
+                : $"Time expired: most kills ({winnerKills})";
         }
 
         return "Most kills wins";
+    }
+
+    int CountPlayersWithKills(int killCount)
+    {
+        int count = 0;
+
+        if (m_GameFlowManager == null)
+            return count;
+
+        for (int i = 0; i < m_GameFlowManager.PlayerIds.Count; i++)
+        {
+            if (m_GameFlowManager.PlayerKills[i] == killCount)
+            {
+                count++;
+            }
+        }
+
+        return count;
     }
 
     static string FormatOrdinal(int value)
@@ -576,6 +649,7 @@ public class ScoreboardUI : MonoBehaviour
         BuildCountdownOverlay(canvasObj);
         BuildScoreboardOverlay(canvasObj);
         BuildMatchEndOverlay(canvasObj);
+        BuildHelpOverlay(canvasObj);
     }
 
     void BuildHUD(GameObject canvas)
@@ -614,6 +688,11 @@ public class ScoreboardUI : MonoBehaviour
         // Tab hint
         CreateText(canvas, "TabHint", "Tab  Scoreboard", 10,
             TextDim, FontStyles.Normal, new Vector2(0, -60),
+            new Vector2(160, 16), TextAlignmentOptions.Center,
+            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f));
+
+        CreateText(canvas, "HelpHint", "F1  Rules", 10,
+            TextDim, FontStyles.Normal, new Vector2(0, -78),
             new Vector2(160, 16), TextAlignmentOptions.Center,
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f));
     }
@@ -767,6 +846,43 @@ public class ScoreboardUI : MonoBehaviour
             TextSecondary, new Color(0.09f, 0.1f, 0.13f),
             new Vector2(0, btnY - 50), new Vector2(500, 40));
         backToMenu.onClick.AddListener(OnBackToMenu);
+    }
+
+    void BuildHelpOverlay(GameObject canvas)
+    {
+        m_HelpPanel = CreatePanel(canvas, "HelpOverlay",
+            new Color(0f, 0f, 0f, 0.58f), Vector2.zero, new Vector2(1920, 1080));
+
+        GameObject board = CreatePanel(m_HelpPanel, "HelpBoard", BgCard,
+            new Vector2(0, 35), new Vector2(600, 390));
+
+        CreateText(board, "HelpLabel", "Quick reference", 11,
+            TextDim, FontStyles.Normal, new Vector2(0, 164), new Vector2(520, 18));
+
+        CreateText(board, "HelpTitle", "Deathmatch Rules", 24,
+            TextPrimary, FontStyles.Bold, new Vector2(0, 132), new Vector2(520, 34));
+
+        TextMeshProUGUI objective = CreateText(board, "Objective",
+            "Most kills when the timer ends wins. If kills are tied, fewer deaths decides the winner. Score limit ends the round early.",
+            13, TextSecondary, FontStyles.Normal, new Vector2(0, 88), new Vector2(520, 52));
+        objective.textWrappingMode = TextWrappingModes.Normal;
+
+        CreateImage(board, "HelpDiv", BorderSubtle, new Vector2(0, 52), new Vector2(520, 1));
+
+        TextMeshProUGUI controls = CreateText(board, "Controls",
+            "WASD        Move\nMouse       Aim\nLeft Click  Fire\nR           Reload\n1-3/Scroll  Switch weapon",
+            13, TextPrimary, FontStyles.Normal, new Vector2(-145, -25), new Vector2(230, 135),
+            TextAlignmentOptions.Left);
+        controls.textWrappingMode = TextWrappingModes.NoWrap;
+
+        TextMeshProUGUI gameplay = CreateText(board, "Gameplay",
+            "E           Pick up\nTab         Scoreboard\nF1 or H     Rules\nEsc         Close this panel\nRespawn     3 seconds + protection",
+            13, TextPrimary, FontStyles.Normal, new Vector2(155, -25), new Vector2(260, 135),
+            TextAlignmentOptions.Left);
+        gameplay.textWrappingMode = TextWrappingModes.NoWrap;
+
+        CreateText(board, "HelpFooter", "Pickups reset every round. Host controls the next round.",
+            11, TextDim, FontStyles.Normal, new Vector2(0, -168), new Vector2(520, 18));
     }
 
     void CreateScoreHeader(GameObject parent, float yPos)
