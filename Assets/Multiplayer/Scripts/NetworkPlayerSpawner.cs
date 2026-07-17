@@ -71,22 +71,33 @@ public class NetworkPlayerSpawner : MonoBehaviour
 
     void SpawnPlayer(ulong clientId)
     {
-        var spawnPoints = FindObjectsByType<PlayerSpawnPoint>(FindObjectsSortMode.None);
-
         Vector3 position = Vector3.zero;
         Quaternion rotation = Quaternion.identity;
+        GameFlowManager gameFlowManager = FindFirstObjectByType<GameFlowManager>();
 
-        if (spawnPoints.Length > 0)
+        if (gameFlowManager != null)
         {
-            Transform point = spawnPoints[Random.Range(0, spawnPoints.Length)].transform;
+            Transform point = gameFlowManager.GetBestSpawnPoint(clientId);
             position = point.position;
             rotation = point.rotation;
+        }
+        else
+        {
+            var spawnPoints = FindObjectsByType<PlayerSpawnPoint>(FindObjectsSortMode.None);
+            if (spawnPoints.Length > 0)
+            {
+                Transform point = spawnPoints[Random.Range(0, spawnPoints.Length)].transform;
+                position = point.position;
+                rotation = point.rotation;
+            }
         }
 
         Debug.Log($"[Spawner] Spawning player {clientId} at {position}");
 
         GameObject player = Instantiate(PlayerPrefab, position, rotation);
-        player.GetComponent<NetworkObject>().SpawnAsPlayerObject(clientId, true);
+        NetworkObject networkObject = player.GetComponent<NetworkObject>();
+        networkObject.SpawnAsPlayerObject(clientId, true);
+        gameFlowManager?.InitializePlayerForCurrentMatch(clientId, networkObject);
     }
 
     void OnDestroy()

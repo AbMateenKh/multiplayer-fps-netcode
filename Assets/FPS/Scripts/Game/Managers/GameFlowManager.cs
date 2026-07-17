@@ -179,7 +179,7 @@ namespace Unity.FPS.Game
                     return;
                 }
 
-                MatchTimer.Value -= Time.deltaTime;
+                MatchTimer.Value = Mathf.Max(0f, MatchTimer.Value - Time.deltaTime);
 
                 if (MatchTimer.Value <= 0f)
                 {
@@ -269,6 +269,24 @@ namespace Unity.FPS.Game
 
             SyncConsumedPickupsToClient(clientId);
             RefreshSoloTargetDummies();
+        }
+
+        public void InitializePlayerForCurrentMatch(ulong clientId, NetworkObject playerObject)
+        {
+            if (!IsServer || playerObject == null)
+                return;
+
+            RegisterPlayer(clientId);
+            ResetMatchHandlers(playerObject.gameObject);
+
+            Health health = playerObject.GetComponent<Health>();
+            if (health != null)
+            {
+                health.Respawn();
+            }
+
+            Transform spawnPoint = GetBestSpawnPoint(clientId);
+            MovePlayerToSpawn(clientId, playerObject, spawnPoint);
         }
 
         public void UnregisterPlayer(ulong clientId)
@@ -389,20 +407,34 @@ namespace Unity.FPS.Game
                     }
 
                     Transform spawnPoint = GetBestSpawnPoint(clientId);
-
-                    // Tell the owner to move (since movement is owner-authoritative)
-                    RespawnAtPositionClientRpc(spawnPoint.position, spawnPoint.rotation,
-                        new ClientRpcParams
-                        {
-                            Send = new ClientRpcSendParams
-                            {
-                                TargetClientIds = new ulong[] { clientId }
-                            }
-                        });
+                    MovePlayerToSpawn(clientId, client.PlayerObject, spawnPoint);
 
                     break;
                 }
             }
+        }
+
+        void MovePlayerToSpawn(ulong clientId, NetworkObject playerObject, Transform spawnPoint)
+        {
+            if (playerObject == null || spawnPoint == null)
+                return;
+
+            if (clientId == NetworkManager.ServerClientId)
+            {
+                CharacterController cc = playerObject.GetComponent<CharacterController>();
+                if (cc != null) cc.enabled = false;
+                playerObject.transform.SetPositionAndRotation(spawnPoint.position, spawnPoint.rotation);
+                if (cc != null) cc.enabled = true;
+            }
+
+            RespawnAtPositionClientRpc(spawnPoint.position, spawnPoint.rotation,
+                new ClientRpcParams
+                {
+                    Send = new ClientRpcSendParams
+                    {
+                        TargetClientIds = new ulong[] { clientId }
+                    }
+                });
         }
 
         [ClientRpc]
@@ -425,7 +457,7 @@ namespace Unity.FPS.Game
             }
         }
 
-        Transform GetBestSpawnPoint(ulong spawningClientId)
+        public Transform GetBestSpawnPoint(ulong spawningClientId)
         {
             PlayerSpawnPoint[] spawnPoints = FindObjectsByType<PlayerSpawnPoint>(FindObjectsSortMode.None);
             if (spawnPoints.Length == 0)
@@ -543,14 +575,7 @@ namespace Unity.FPS.Game
                 ResetMatchHandlers(client.PlayerObject.gameObject);
 
                 Transform spawnPoint = GetBestSpawnPoint(client.ClientId);
-                RespawnAtPositionClientRpc(spawnPoint.position, spawnPoint.rotation,
-                    new ClientRpcParams
-                    {
-                        Send = new ClientRpcSendParams
-                        {
-                            TargetClientIds = new ulong[] { client.ClientId }
-                        }
-                    });
+                MovePlayerToSpawn(client.ClientId, client.PlayerObject, spawnPoint);
             }
 
             ResetAllMatchPickups();
@@ -798,6 +823,9 @@ namespace Unity.FPS.Game
         void EndMatchServer(MatchEndReason reason)
         {
             if (!IsServer)
+                return;
+
+            if (IsMatchOver.Value)
                 return;
 
             MatchTimer.Value = Mathf.Max(0f, MatchTimer.Value);

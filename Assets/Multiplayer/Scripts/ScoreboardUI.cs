@@ -425,7 +425,7 @@ public class ScoreboardUI : MonoBehaviour
             ? $"Respawning in {remaining:0.0}s"
             : "Respawning...";
 
-        bool hasRespawned = m_LocalHealth != null && m_LocalHealth.CurrentHealth.Value > 0f && remaining <= 0.05f;
+        bool hasRespawned = m_LocalHealth != null && m_LocalHealth.CurrentHealth.Value > 0f;
         if (hasRespawned)
         {
             HideDeathOverlay();
@@ -454,7 +454,8 @@ public class ScoreboardUI : MonoBehaviour
         if (m_PickupPromptText == null)
             return;
 
-        if (m_DeathShown || m_MatchEndShown || m_LocalPlayer == null)
+        if (m_DeathShown || m_MatchEndShown || m_LocalPlayer == null ||
+            m_GameFlowManager == null || !m_GameFlowManager.IsGameplayActive)
         {
             m_PickupPromptText.gameObject.SetActive(false);
             return;
