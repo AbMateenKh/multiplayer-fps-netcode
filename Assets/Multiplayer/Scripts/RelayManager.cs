@@ -9,6 +9,7 @@ using UnityEngine;
 public class RelayManager : MonoBehaviour
 {
     public static RelayManager Instance { get; private set; }
+    public string LastErrorMessage { get; private set; }
 
    
     void Awake()
@@ -30,6 +31,8 @@ public class RelayManager : MonoBehaviour
     {
         try
         {
+            LastErrorMessage = string.Empty;
+
             // Create allocation (maxPlayers excludes the host)
             Allocation allocation = await RelayService.Instance.CreateAllocationAsync(maxPlayers);
 
@@ -58,6 +61,7 @@ public class RelayManager : MonoBehaviour
         catch (Exception e)
         {
             Debug.LogError($"[Relay] Failed to create relay: {e.Message}");
+            LastErrorMessage = "Could not create Relay allocation. Check services, internet, and Unity dashboard setup.";
             return null;
         }
     }
@@ -69,6 +73,7 @@ public class RelayManager : MonoBehaviour
     {
         try
         {
+            LastErrorMessage = string.Empty;
             Debug.Log($"[Relay] Joining with code: {joinCode}");
 
             JoinAllocation joinAllocation = await RelayService.Instance.JoinAllocationAsync(joinCode);
@@ -94,6 +99,7 @@ public class RelayManager : MonoBehaviour
         catch (Exception e)
         {
             Debug.LogError($"[Relay] Failed to join relay: {e.Message}");
+            LastErrorMessage = "Could not connect to Relay. The lobby may have closed or the join code expired.";
             return false;
         }
     }

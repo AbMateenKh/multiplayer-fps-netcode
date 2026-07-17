@@ -52,7 +52,11 @@ public class ScoreboardUI : MonoBehaviour
     TextMeshProUGUI m_PickupFeedbackText;
     TextMeshProUGUI m_CountdownText;
     TextMeshProUGUI m_CountdownLabelText;
+    TextMeshProUGUI m_LowHealthText;
+    TextMeshProUGUI m_SensitivityValueText;
+    TextMeshProUGUI m_MasterVolumeValueText;
     GameObject m_CountdownPanel;
+    GameObject m_PausePanel;
     GameObject m_KillFeedContainer;
     GameFlowManager m_GameFlowManager;
     PlayerCharacterController m_LocalPlayer;
@@ -69,6 +73,16 @@ public class ScoreboardUI : MonoBehaviour
     float m_HitMarkerDuration = 0.16f;
     float m_KillConfirmVisibleUntil = Mathf.NegativeInfinity;
     float m_PickupFeedbackVisibleUntil = Mathf.NegativeInfinity;
+    int m_LastCountdownDisplayValue = -1;
+
+    const string k_MasterVolumePrefsKey = "NetcodeFPS.MasterVolume";
+
+    [Header("Optional HUD Audio")]
+    public AudioClip CountdownTickSfx;
+    public AudioClip MatchEndSfx;
+    public AudioClip KillConfirmSfx;
+    public AudioClip PickupConfirmSfx;
+    public AudioClip PauseOpenSfx;
 
     void Start()
     {
@@ -77,11 +91,14 @@ public class ScoreboardUI : MonoBehaviour
         m_MatchEndPanel.SetActive(false);
         m_DeathPanel.SetActive(false);
         m_HelpPanel.SetActive(false);
+        m_PausePanel.SetActive(false);
         m_HitMarkerText.gameObject.SetActive(false);
         m_KillConfirmText.gameObject.SetActive(false);
         m_ProtectionText.gameObject.SetActive(false);
         m_PickupPromptText.gameObject.SetActive(false);
         m_PickupFeedbackText.gameObject.SetActive(false);
+        m_LowHealthText.gameObject.SetActive(false);
+        RefreshSettingsValues();
 
         PlayerCharacterController.OnLocalPlayerSpawned += OnLocalPlayerSpawned;
         PlayerCharacterController.OnLocalShotConfirmed += OnLocalShotConfirmed;
@@ -110,6 +127,8 @@ public class ScoreboardUI : MonoBehaviour
         UpdateCountdown();
         UpdateCombatFeedback();
         UpdateHelpInput();
+        UpdatePauseInput();
+        UpdateLowHealthWarning();
 
         // Tab toggle scoreboard (not during match end)
         if (!m_MatchEndShown)
@@ -127,8 +146,7 @@ public class ScoreboardUI : MonoBehaviour
                 m_ScoreboardPanel.SetActive(false);
                 if (m_HelpPanel == null || !m_HelpPanel.activeSelf)
                 {
-                    Cursor.lockState = CursorLockMode.Locked;
-                    Cursor.visible = false;
+                    RestoreGameplayCursorIfNeeded();
                 }
             }
         }
@@ -152,7 +170,9 @@ public class ScoreboardUI : MonoBehaviour
         HideDeathOverlay();
         SetHelpOverlayVisible(false);
         m_ScoreboardPanel.SetActive(false);
+        SetPauseOverlayVisible(false);
         m_MatchEndPanel.SetActive(true);
+        PlayHudSfx(MatchEndSfx, AudioUtility.AudioGroups.HUDVictory);
 
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
@@ -177,12 +197,12 @@ public class ScoreboardUI : MonoBehaviour
 
     void OnLocalShotConfirmed()
     {
-        ShowHitMarker("X", TextPrimary, 0.16f);
+        ShowHitMarker("HIT", TextPrimary, 0.16f);
     }
 
     void OnLocalShotBlocked()
     {
-        ShowHitMarker("PROTECTED", AccentBlue, 0.45f);
+        ShowHitMarker("BLOCKED", AccentBlue, 0.45f);
     }
 
     void ShowHitMarker(string text, Color color, float duration)
@@ -209,6 +229,7 @@ public class ScoreboardUI : MonoBehaviour
         m_PickupFeedbackVisibleUntil = Time.time + 1.15f;
         m_PickupFeedbackText.gameObject.SetActive(true);
         m_PickupPromptText.gameObject.SetActive(false);
+        PlayHudSfx(PickupConfirmSfx, AudioUtility.AudioGroups.Pickup);
     }
 
     void OnPlayerKilled(ulong victimId, ulong killerId)
@@ -230,6 +251,7 @@ public class ScoreboardUI : MonoBehaviour
             m_KillConfirmText.text = "ELIMINATION";
             m_KillConfirmVisibleUntil = Time.time + 1.25f;
             m_KillConfirmText.gameObject.SetActive(true);
+            PlayHudSfx(KillConfirmSfx, AudioUtility.AudioGroups.HUDObjective);
         }
     }
 
@@ -317,6 +339,7 @@ public class ScoreboardUI : MonoBehaviour
         m_MatchEndPanel.SetActive(false);
         m_ScoreboardPanel.SetActive(false);
         SetHelpOverlayVisible(false);
+        SetPauseOverlayVisible(false);
 
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
@@ -347,12 +370,27 @@ public class ScoreboardUI : MonoBehaviour
         }
     }
 
+    void UpdatePauseInput()
+    {
+        if (m_PausePanel == null || m_MatchEndShown)
+            return;
+
+        if (m_HelpPanel != null && m_HelpPanel.activeSelf)
+            return;
+
+        if (Input.GetKeyDown(KeyCode.Escape))
+        {
+            SetPauseOverlayVisible(!m_PausePanel.activeSelf);
+        }
+    }
+
     void SetHelpOverlayVisible(bool visible)
     {
         if (m_HelpPanel == null)
             return;
 
         m_HelpPanel.SetActive(visible);
+        PlayerInputHandler.SetMenuInputBlocked(visible || (m_PausePanel != null && m_PausePanel.activeSelf));
 
         if (visible)
         {
@@ -361,9 +399,44 @@ public class ScoreboardUI : MonoBehaviour
         }
         else if (!m_MatchEndShown && (m_ScoreboardPanel == null || !m_ScoreboardPanel.activeSelf))
         {
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
+            RestoreGameplayCursorIfNeeded();
         }
+    }
+
+    void SetPauseOverlayVisible(bool visible)
+    {
+        if (m_PausePanel == null)
+            return;
+
+        m_PausePanel.SetActive(visible);
+        PlayerInputHandler.SetMenuInputBlocked(visible || (m_HelpPanel != null && m_HelpPanel.activeSelf));
+
+        if (visible)
+        {
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+            RefreshSettingsValues();
+            PlayHudSfx(PauseOpenSfx, AudioUtility.AudioGroups.HUDObjective);
+        }
+        else
+        {
+            RestoreGameplayCursorIfNeeded();
+        }
+    }
+
+    void RestoreGameplayCursorIfNeeded()
+    {
+        bool anyOverlayOpen =
+            m_MatchEndShown ||
+            (m_PausePanel != null && m_PausePanel.activeSelf) ||
+            (m_HelpPanel != null && m_HelpPanel.activeSelf) ||
+            (m_ScoreboardPanel != null && m_ScoreboardPanel.activeSelf);
+
+        if (anyOverlayOpen)
+            return;
+
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
     }
 
     void UpdateTimer()
@@ -498,15 +571,42 @@ public class ScoreboardUI : MonoBehaviour
         bool showCountdown = m_GameFlowManager.IsCountdownActive.Value && !m_GameFlowManager.IsMatchOver.Value;
         m_CountdownPanel.SetActive(showCountdown);
         if (!showCountdown)
+        {
+            m_LastCountdownDisplayValue = -1;
             return;
+        }
 
         float remaining = m_GameFlowManager.CountdownTimer.Value;
         int displayValue = Mathf.CeilToInt(Mathf.Max(remaining, 0.01f));
         m_CountdownText.text = displayValue.ToString();
         m_CountdownLabelText.text = "GET READY";
 
+        if (displayValue != m_LastCountdownDisplayValue)
+        {
+            m_LastCountdownDisplayValue = displayValue;
+            PlayHudSfx(CountdownTickSfx, AudioUtility.AudioGroups.HUDObjective);
+        }
+
         float pulse = 1f + Mathf.PingPong(Time.time * 0.8f, 0.08f);
         m_CountdownText.rectTransform.localScale = Vector3.one * pulse;
+    }
+
+    void UpdateLowHealthWarning()
+    {
+        if (m_LowHealthText == null)
+            return;
+
+        bool show = !m_DeathShown && !m_MatchEndShown && m_LocalHealth != null &&
+            m_LocalHealth.CurrentHealth.Value > 0f && m_LocalHealth.IsCritical();
+
+        m_LowHealthText.gameObject.SetActive(show);
+        if (!show)
+            return;
+
+        float alpha = Mathf.Lerp(0.42f, 1f, Mathf.PingPong(Time.time * 3.5f, 1f));
+        Color color = AccentRed;
+        color.a = alpha;
+        m_LowHealthText.color = color;
     }
 
     void RefreshScoreboard(GameObject container, List<GameObject> rows)
@@ -651,6 +751,7 @@ public class ScoreboardUI : MonoBehaviour
         BuildScoreboardOverlay(canvasObj);
         BuildMatchEndOverlay(canvasObj);
         BuildHelpOverlay(canvasObj);
+        BuildPauseOverlay(canvasObj);
     }
 
     void BuildHUD(GameObject canvas)
@@ -719,6 +820,10 @@ public class ScoreboardUI : MonoBehaviour
         m_PickupFeedbackText = CreateText(canvas, "PickupFeedback", "+ PICKUP", 16,
             AccentGreenText, FontStyles.Bold, new Vector2(0, -206), new Vector2(320, 30));
         m_PickupFeedbackText.raycastTarget = false;
+
+        m_LowHealthText = CreateText(canvas, "LowHealth", "LOW HEALTH", 16,
+            AccentRed, FontStyles.Bold, new Vector2(0, -246), new Vector2(320, 30));
+        m_LowHealthText.raycastTarget = false;
 
         m_KillFeedContainer = new GameObject("KillFeed");
         m_KillFeedContainer.transform.SetParent(canvas.transform, false);
@@ -884,6 +989,61 @@ public class ScoreboardUI : MonoBehaviour
 
         CreateText(board, "HelpFooter", "Pickups reset every round. Host controls the next round.",
             11, TextDim, FontStyles.Normal, new Vector2(0, -168), new Vector2(520, 18));
+    }
+
+    void BuildPauseOverlay(GameObject canvas)
+    {
+        m_PausePanel = CreatePanel(canvas, "PauseOverlay",
+            new Color(0f, 0f, 0f, 0.62f), Vector2.zero, new Vector2(1920, 1080));
+
+        GameObject board = CreatePanel(m_PausePanel, "PauseBoard", BgCard,
+            new Vector2(0, 35), new Vector2(520, 430));
+
+        CreateText(board, "PauseLabel", "Match paused locally", 11,
+            TextDim, FontStyles.Normal, new Vector2(0, 176), new Vector2(460, 18));
+
+        CreateText(board, "PauseTitle", "Options", 26,
+            TextPrimary, FontStyles.Bold, new Vector2(0, 142), new Vector2(460, 36));
+
+        Button resumeButton = CreateButton(board, "ResumeButton", "Resume",
+            TextPrimary, new Color(0.05f, 0.27f, 0.49f), new Vector2(0, 88), new Vector2(440, 44));
+        resumeButton.onClick.AddListener(() => SetPauseOverlayVisible(false));
+
+        CreateSettingsStepper(board, "Sensitivity", "Mouse sensitivity",
+            new Vector2(0, 24), out m_SensitivityValueText,
+            () => AdjustLookSensitivity(-0.1f), () => AdjustLookSensitivity(0.1f));
+
+        CreateSettingsStepper(board, "Volume", "Master volume",
+            new Vector2(0, -48), out m_MasterVolumeValueText,
+            () => AdjustMasterVolume(-0.1f), () => AdjustMasterVolume(0.1f));
+
+        Button fullscreenButton = CreateButton(board, "FullscreenButton", "Toggle fullscreen",
+            TextSecondary, BgRow, new Vector2(0, -112), new Vector2(440, 38));
+        fullscreenButton.onClick.AddListener(ToggleFullscreen);
+
+        Button leaveButton = CreateButton(board, "LeaveMatchButton", "Leave match",
+            AccentRed, BgRow, new Vector2(0, -164), new Vector2(440, 38));
+        leaveButton.onClick.AddListener(OnBackToMenu);
+    }
+
+    void CreateSettingsStepper(GameObject parent, string name, string label, Vector2 position,
+        out TextMeshProUGUI valueText, UnityEngine.Events.UnityAction onMinus, UnityEngine.Events.UnityAction onPlus)
+    {
+        GameObject row = CreatePanel(parent, name, BgRow, position, new Vector2(440, 54));
+
+        CreateText(row, $"{name}Label", label, 12,
+            TextSecondary, FontStyles.Normal, new Vector2(-125, 0), new Vector2(150, 24), TextAlignmentOptions.Left);
+
+        Button minus = CreateButton(row, $"{name}Minus", "-", TextPrimary, BgHUD,
+            new Vector2(62, 0), new Vector2(38, 30));
+        minus.onClick.AddListener(onMinus);
+
+        valueText = CreateText(row, $"{name}Value", "1.0", 13,
+            TextPrimary, FontStyles.Bold, new Vector2(116, 0), new Vector2(64, 30));
+
+        Button plus = CreateButton(row, $"{name}Plus", "+", TextPrimary, BgHUD,
+            new Vector2(170, 0), new Vector2(38, 30));
+        plus.onClick.AddListener(onPlus);
     }
 
     void CreateScoreHeader(GameObject parent, float yPos)
@@ -1096,6 +1256,74 @@ public class ScoreboardUI : MonoBehaviour
         return "PICKUP";
     }
 
+    void AdjustLookSensitivity(float delta)
+    {
+        PlayerInputHandler input = m_LocalPlayer != null
+            ? m_LocalPlayer.GetComponent<PlayerInputHandler>()
+            : FindFirstObjectByType<PlayerInputHandler>();
+
+        float current = input != null
+            ? input.LookSensitivity
+            : PlayerPrefs.GetFloat(PlayerInputHandler.LookSensitivityPrefsKey, 1f);
+
+        float next = Mathf.Clamp(current + delta, 0.2f, 3f);
+        if (input != null)
+        {
+            input.LookSensitivity = next;
+        }
+
+        PlayerPrefs.SetFloat(PlayerInputHandler.LookSensitivityPrefsKey, next);
+        PlayerPrefs.Save();
+        RefreshSettingsValues();
+    }
+
+    void AdjustMasterVolume(float delta)
+    {
+        float current = PlayerPrefs.GetFloat(k_MasterVolumePrefsKey, AudioUtility.GetMasterVolume());
+        float next = Mathf.Clamp01(current + delta);
+        AudioUtility.SetMasterVolume(next);
+        PlayerPrefs.SetFloat(k_MasterVolumePrefsKey, next);
+        PlayerPrefs.Save();
+        RefreshSettingsValues();
+    }
+
+    void ToggleFullscreen()
+    {
+        Screen.fullScreen = !Screen.fullScreen;
+    }
+
+    void RefreshSettingsValues()
+    {
+        if (m_SensitivityValueText != null)
+        {
+            float sensitivity = PlayerPrefs.GetFloat(PlayerInputHandler.LookSensitivityPrefsKey, 1f);
+            if (m_LocalPlayer != null)
+            {
+                PlayerInputHandler input = m_LocalPlayer.GetComponent<PlayerInputHandler>();
+                if (input != null)
+                {
+                    sensitivity = input.LookSensitivity;
+                }
+            }
+
+            m_SensitivityValueText.text = sensitivity.ToString("0.0");
+        }
+
+        if (m_MasterVolumeValueText != null)
+        {
+            float volume = PlayerPrefs.GetFloat(k_MasterVolumePrefsKey, AudioUtility.GetMasterVolume());
+            m_MasterVolumeValueText.text = $"{Mathf.RoundToInt(volume * 100f)}%";
+        }
+    }
+
+    void PlayHudSfx(AudioClip clip, AudioUtility.AudioGroups group)
+    {
+        if (clip == null)
+            return;
+
+        AudioUtility.CreateSFX(clip, Vector3.zero, group, 0f);
+    }
+
     void SetCombatHudVisible(bool visible)
     {
         if (m_HudBar != null)
@@ -1107,6 +1335,7 @@ public class ScoreboardUI : MonoBehaviour
     void OnBackToMenu()
     {
         SetHelpOverlayVisible(false);
+        SetPauseOverlayVisible(false);
         HideDeathOverlay();
         m_MatchEndShown = false;
 
@@ -1239,6 +1468,7 @@ public class ScoreboardUI : MonoBehaviour
         PlayerCharacterController.OnLocalShotBlocked -= OnLocalShotBlocked;
         Pickup.OnLocalPickupConfirmed -= OnLocalPickupConfirmed;
         GameFlowManager.OnPlayerKilled -= OnPlayerKilled;
+        PlayerInputHandler.SetMenuInputBlocked(false);
     }
 
     class KillFeedRow : MonoBehaviour

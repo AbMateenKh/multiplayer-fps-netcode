@@ -15,6 +15,10 @@ public class LobbyManager : MonoBehaviour
     float m_PollTimer;
     const float HeartbeatInterval = 15f;
     const float PollInterval = 1.5f;
+    const string PlayerNameKey = "PlayerName";
+    const string ReadyKey = "Ready";
+
+    public string LastErrorMessage { get; private set; }
 
     public event Action<List<PlayerLobbyData>> OnLobbyPlayersChanged;
 
@@ -39,8 +43,15 @@ public class LobbyManager : MonoBehaviour
     {
         try
         {
+            LastErrorMessage = string.Empty;
             string relayJoinCode = await RelayManager.Instance.CreateRelay(maxPlayers - 1);
-            if (relayJoinCode == null) return null;
+            if (relayJoinCode == null)
+            {
+                LastErrorMessage = RelayManager.Instance != null
+                    ? RelayManager.Instance.LastErrorMessage
+                    : "Could not create Relay allocation.";
+                return null;
+            }
 
             CreateLobbyOptions options = new CreateLobbyOptions
             {
@@ -66,6 +77,7 @@ public class LobbyManager : MonoBehaviour
         catch (Exception e)
         {
             Debug.LogError($"[Lobby] Failed to create public lobby: {e.Message}");
+            LastErrorMessage = "Could not create public lobby. Check Unity Services sign-in and network connection.";
             return null;
         }
     }
@@ -74,8 +86,15 @@ public class LobbyManager : MonoBehaviour
     {
         try
         {
+            LastErrorMessage = string.Empty;
             string relayJoinCode = await RelayManager.Instance.CreateRelay(maxPlayers - 1);
-            if (relayJoinCode == null) return null;
+            if (relayJoinCode == null)
+            {
+                LastErrorMessage = RelayManager.Instance != null
+                    ? RelayManager.Instance.LastErrorMessage
+                    : "Could not create Relay allocation.";
+                return null;
+            }
 
             CreateLobbyOptions options = new CreateLobbyOptions
             {
@@ -101,6 +120,7 @@ public class LobbyManager : MonoBehaviour
         catch (Exception e)
         {
             Debug.LogError($"[Lobby] Failed to create private lobby: {e.Message}");
+            LastErrorMessage = "Could not create private lobby. Check Unity Services sign-in and network connection.";
             return null;
         }
     }
@@ -109,6 +129,7 @@ public class LobbyManager : MonoBehaviour
     {
         try
         {
+            LastErrorMessage = string.Empty;
             JoinLobbyByCodeOptions options = new JoinLobbyByCodeOptions
             {
                 Player = CreatePlayerData(playerName)
@@ -118,11 +139,18 @@ public class LobbyManager : MonoBehaviour
             Debug.Log($"[Lobby] Joined: {m_CurrentLobby.Name}");
 
             string relayJoinCode = m_CurrentLobby.Data["RelayJoinCode"].Value;
-            return await RelayManager.Instance.JoinRelay(relayJoinCode);
+            bool joinedRelay = await RelayManager.Instance.JoinRelay(relayJoinCode);
+            if (!joinedRelay)
+            {
+                LastErrorMessage = RelayManager.Instance.LastErrorMessage;
+            }
+
+            return joinedRelay;
         }
         catch (Exception e)
         {
             Debug.LogError($"[Lobby] Failed to join by code: {e.Message}");
+            LastErrorMessage = "Could not join lobby. Check the code, or ask the host to create a fresh lobby.";
             return false;
         }
     }
@@ -131,6 +159,7 @@ public class LobbyManager : MonoBehaviour
     {
         try
         {
+            LastErrorMessage = string.Empty;
             QuickJoinLobbyOptions options = new QuickJoinLobbyOptions
             {
                 Player = CreatePlayerData(playerName)
@@ -140,11 +169,18 @@ public class LobbyManager : MonoBehaviour
             Debug.Log($"[Lobby] Quick joined: {m_CurrentLobby.Name}");
 
             string relayJoinCode = m_CurrentLobby.Data["RelayJoinCode"].Value;
-            return await RelayManager.Instance.JoinRelay(relayJoinCode);
+            bool joinedRelay = await RelayManager.Instance.JoinRelay(relayJoinCode);
+            if (!joinedRelay)
+            {
+                LastErrorMessage = RelayManager.Instance.LastErrorMessage;
+            }
+
+            return joinedRelay;
         }
         catch (Exception e)
         {
             Debug.LogError($"[Lobby] No lobbies available: {e.Message}");
+            LastErrorMessage = "No public lobbies are available right now.";
             return false;
         }
     }
@@ -156,9 +192,14 @@ public class LobbyManager : MonoBehaviour
             Data = new Dictionary<string, PlayerDataObject>
             {
                 {
-                    "PlayerName", new PlayerDataObject(
+                    PlayerNameKey, new PlayerDataObject(
                         PlayerDataObject.VisibilityOptions.Member,
                         playerName)
+                },
+                {
+                    ReadyKey, new PlayerDataObject(
+                        PlayerDataObject.VisibilityOptions.Member,
+                        "false")
                 }
             }
         };
@@ -207,6 +248,7 @@ public class LobbyManager : MonoBehaviour
         catch (Exception e)
         {
             Debug.LogError($"[Lobby] Poll failed: {e.Message}");
+            LastErrorMessage = "Lost lobby connection. Return to menu and try again.";
             m_CurrentLobby = null;
         }
     }
@@ -222,7 +264,12 @@ public class LobbyManager : MonoBehaviour
             string name = GetPlayerName(p);
 
             bool isHost = p.Id == m_CurrentLobby.HostId;
-            players.Add(new PlayerLobbyData { Name = name, IsHost = isHost });
+            players.Add(new PlayerLobbyData
+            {
+                Name = name,
+                IsHost = isHost,
+                IsReady = isHost || GetPlayerReady(p)
+            });
         }
 
         OnLobbyPlayersChanged?.Invoke(players);
@@ -245,6 +292,8 @@ public class LobbyManager : MonoBehaviour
             builder.Append(player.Id);
             builder.Append(':');
             builder.Append(GetPlayerName(player));
+            builder.Append(':');
+            builder.Append(GetPlayerReady(player));
         }
 
         return builder.ToString();
@@ -252,12 +301,93 @@ public class LobbyManager : MonoBehaviour
 
     string GetPlayerName(Player player)
     {
-        if (player.Data != null && player.Data.ContainsKey("PlayerName"))
+        if (player.Data != null && player.Data.ContainsKey(PlayerNameKey))
         {
-            return player.Data["PlayerName"].Value;
+            return player.Data[PlayerNameKey].Value;
         }
 
         return "Unknown";
+    }
+
+    bool GetPlayerReady(Player player)
+    {
+        if (player.Data != null && player.Data.ContainsKey(ReadyKey))
+        {
+            return string.Equals(player.Data[ReadyKey].Value, "true", StringComparison.OrdinalIgnoreCase);
+        }
+
+        return false;
+    }
+
+    public bool IsLocalPlayerReady()
+    {
+        if (m_CurrentLobby == null)
+            return false;
+
+        string localPlayerId = AuthenticationService.Instance.PlayerId;
+        for (int i = 0; i < m_CurrentLobby.Players.Count; i++)
+        {
+            Player player = m_CurrentLobby.Players[i];
+            if (player.Id == localPlayerId)
+            {
+                return player.Id == m_CurrentLobby.HostId || GetPlayerReady(player);
+            }
+        }
+
+        return false;
+    }
+
+    public bool AreAllPlayersReady()
+    {
+        if (m_CurrentLobby == null || m_CurrentLobby.Players == null || m_CurrentLobby.Players.Count == 0)
+            return false;
+
+        for (int i = 0; i < m_CurrentLobby.Players.Count; i++)
+        {
+            Player player = m_CurrentLobby.Players[i];
+            if (player.Id == m_CurrentLobby.HostId)
+                continue;
+
+            if (!GetPlayerReady(player))
+                return false;
+        }
+
+        return true;
+    }
+
+    public async Task<bool> SetLocalReady(bool isReady)
+    {
+        if (m_CurrentLobby == null)
+            return false;
+
+        try
+        {
+            LastErrorMessage = string.Empty;
+            UpdatePlayerOptions options = new UpdatePlayerOptions
+            {
+                Data = new Dictionary<string, PlayerDataObject>
+                {
+                    {
+                        ReadyKey, new PlayerDataObject(
+                            PlayerDataObject.VisibilityOptions.Member,
+                            isReady ? "true" : "false")
+                    }
+                }
+            };
+
+            m_CurrentLobby = await LobbyService.Instance.UpdatePlayerAsync(
+                m_CurrentLobby.Id,
+                AuthenticationService.Instance.PlayerId,
+                options);
+            NotifyPlayersChanged();
+            return true;
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[Lobby] Failed to update ready state: {e.Message}");
+            LastErrorMessage = "Could not update ready state. Check the lobby connection.";
+            return false;
+        }
     }
 
     public bool IsHost()
@@ -293,4 +423,5 @@ public struct PlayerLobbyData
 {
     public string Name;
     public bool IsHost;
+    public bool IsReady;
 }

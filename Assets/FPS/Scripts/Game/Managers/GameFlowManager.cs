@@ -49,6 +49,13 @@ namespace Unity.FPS.Game
         [Tooltip("Fallback distance used when the scene has no player spawn points.")]
         public float SoloTargetSpawnRadius = 12f;
 
+        [Header("Diagnostics")]
+        [Tooltip("Logs lightweight runtime FPS and player-count samples while enabled.")]
+        public bool EnableRuntimePerformanceLogging;
+
+        [Tooltip("Seconds between runtime performance log samples.")]
+        public float PerformanceLogInterval = 15f;
+
         [Header("End Game")]
         [Tooltip("Duration of the fade-to-black at the end of the game")]
         public float EndSceneLoadDelay = 3f;
@@ -113,9 +120,13 @@ namespace Unity.FPS.Game
         float m_TimeLoadEndGameScene;
         bool m_GameIsEnding;
         bool m_IsReturningToMenuAfterHostDisconnect;
+        float m_PerformanceSampleTimer;
+        float m_PerformanceFrameTimeSum;
+        int m_PerformanceFrameCount;
         readonly List<TargetPracticeDummy> m_SoloTargetDummies = new List<TargetPracticeDummy>();
 
         const string k_PendingMenuStatusKey = "NetcodeFPS.PendingMenuStatus";
+        const string k_MasterVolumePrefsKey = "NetcodeFPS.MasterVolume";
 
 
         public bool GameIsEnding => m_GameIsEnding || IsMatchOver.Value;
@@ -144,6 +155,7 @@ namespace Unity.FPS.Game
 
             // ALL CLIENTS: Listen for match end
             IsMatchOver.OnValueChanged += OnMatchOverChanged;
+            IsCountdownActive.OnValueChanged += OnCountdownActiveChanged;
 
             if (IsMatchOver.Value)
             {
@@ -156,7 +168,7 @@ namespace Unity.FPS.Game
         }
         void Start()
         {
-            AudioUtility.SetMasterVolume(1);
+            AudioUtility.SetMasterVolume(PlayerPrefs.GetFloat(k_MasterVolumePrefsKey, 1f));
         }
 
         // UPDATE — Server counts down, all clients handle end game fade
@@ -194,6 +206,8 @@ namespace Unity.FPS.Game
                 EndGameFadeCanvasGroup.alpha = timeRatio;
                 AudioUtility.SetMasterVolume(1 - timeRatio);
             }
+
+            UpdateRuntimePerformanceSampler();
         }
 
         // MATCH END — Triggered on all clients via NetworkVariable
@@ -207,6 +221,14 @@ namespace Unity.FPS.Game
             else
             {
                 ResetEndMatchState();
+            }
+        }
+
+        void OnCountdownActiveChanged(bool previousValue, bool newValue)
+        {
+            if (previousValue && !newValue && IsGameplayActive)
+            {
+                OnMatchStarted?.Invoke();
             }
         }
 
@@ -368,6 +390,10 @@ namespace Unity.FPS.Game
                     {
                         EndMatchServer(MatchEndReason.ScoreLimit);
                     }
+                }
+                else
+                {
+                    killerId = victimId;
                 }
             }
 
@@ -597,6 +623,30 @@ namespace Unity.FPS.Game
             {
                 OnMatchStarted?.Invoke();
             }
+        }
+
+        void UpdateRuntimePerformanceSampler()
+        {
+            if (!EnableRuntimePerformanceLogging)
+                return;
+
+            m_PerformanceSampleTimer += Time.unscaledDeltaTime;
+            m_PerformanceFrameTimeSum += Time.unscaledDeltaTime;
+            m_PerformanceFrameCount++;
+
+            float interval = Mathf.Max(1f, PerformanceLogInterval);
+            if (m_PerformanceSampleTimer < interval)
+                return;
+
+            float averageFrameTime = m_PerformanceFrameTimeSum / Mathf.Max(1, m_PerformanceFrameCount);
+            float averageFps = averageFrameTime > 0f ? 1f / averageFrameTime : 0f;
+            int connectedClients = NetworkManager.Singleton != null ? NetworkManager.Singleton.ConnectedClientsList.Count : 0;
+
+            Debug.Log($"[Performance] avgFPS={averageFps:F1}, frameMs={averageFrameTime * 1000f:F2}, clients={connectedClients}, gameplayActive={IsGameplayActive}");
+
+            m_PerformanceSampleTimer = 0f;
+            m_PerformanceFrameTimeSum = 0f;
+            m_PerformanceFrameCount = 0;
         }
 
         [ClientRpc]
@@ -883,6 +933,7 @@ namespace Unity.FPS.Game
         public override void OnNetworkDespawn()
         {
             IsMatchOver.OnValueChanged -= OnMatchOverChanged;
+            IsCountdownActive.OnValueChanged -= OnCountdownActiveChanged;
             if (NetworkManager.Singleton != null)
             {
                 NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnected;

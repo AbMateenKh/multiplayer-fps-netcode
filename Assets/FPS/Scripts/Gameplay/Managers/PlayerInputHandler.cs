@@ -6,6 +6,8 @@ namespace Unity.FPS.Gameplay
 {
     public class PlayerInputHandler : MonoBehaviour
     {
+        public const string LookSensitivityPrefsKey = "NetcodeFPS.LookSensitivity";
+
         [Tooltip("Sensitivity multiplier for moving the camera around")]
         public float LookSensitivity = 1f;
 
@@ -27,12 +29,21 @@ namespace Unity.FPS.Gameplay
 
 
         NetworkBehaviour m_NetworkBehaviour;
+        static bool s_MenuInputBlocked;
+
+        public static bool IsMenuInputBlocked => s_MenuInputBlocked;
+
+        public static void SetMenuInputBlocked(bool blocked)
+        {
+            s_MenuInputBlocked = blocked;
+        }
 
         void Start()
         {
             m_PlayerCharacterController = GetComponent<PlayerCharacterController>();
             m_GameFlowManager = FindObjectOfType<GameFlowManager>();
             m_NetworkBehaviour = GetComponent<NetworkBehaviour>();
+            LookSensitivity = PlayerPrefs.GetFloat(LookSensitivityPrefsKey, LookSensitivity);
 
             if (m_NetworkBehaviour != null && m_NetworkBehaviour.IsOwner)
             {
@@ -48,6 +59,9 @@ namespace Unity.FPS.Gameplay
 
         bool CanProcessInput()
         {
+            if (s_MenuInputBlocked)
+                return false;
+
             if (m_NetworkBehaviour != null && !m_NetworkBehaviour.IsOwner)
                 return false;
 

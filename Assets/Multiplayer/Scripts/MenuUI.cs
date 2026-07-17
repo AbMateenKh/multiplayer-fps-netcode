@@ -58,6 +58,8 @@ public class MenuUI : MonoBehaviour
 
     GameObject m_LobbyCodeSection;
     Button m_StartGameButton;
+    Button m_ReadyButton;
+    TextMeshProUGUI m_ReadyButtonLabel;
 
     readonly List<GameObject> m_PlayerSlots = new List<GameObject>();
     readonly List<TextMeshProUGUI> m_PlayerSlotNames = new List<TextMeshProUGUI>();
@@ -244,7 +246,7 @@ public class MenuUI : MonoBehaviour
         m_IsPrivateLobby = isPrivate;
         m_LobbyCodeSection.SetActive(isPrivate);
         m_LobbyTypeText.text = isPrivate ? "Private squad lobby" : "Public squad lobby";
-        m_StartGameButton.gameObject.SetActive(LobbyManager.Instance != null && LobbyManager.Instance.IsHost());
+        RefreshLobbyControls();
         ShowScreen(MenuScreenState.Lobby);
     }
 
@@ -344,7 +346,7 @@ public class MenuUI : MonoBehaviour
         }
         else
         {
-            SetStatus("Failed to create public lobby");
+            SetStatus(GetLobbyError("Failed to create public lobby"));
             ShowScreen(MenuScreenState.ModeSelect);
         }
     }
@@ -374,7 +376,7 @@ public class MenuUI : MonoBehaviour
         }
         else
         {
-            SetStatus("Failed to create private lobby");
+            SetStatus(GetLobbyError("Failed to create private lobby"));
             ShowScreen(MenuScreenState.ModeSelect);
         }
     }
@@ -394,7 +396,7 @@ public class MenuUI : MonoBehaviour
         }
         else
         {
-            SetStatus("No public matches found");
+            SetStatus(GetLobbyError("No public matches found"));
             ShowScreen(MenuScreenState.ModeSelect);
         }
     }
@@ -424,7 +426,7 @@ public class MenuUI : MonoBehaviour
         }
         else
         {
-            SetStatus("Failed to join lobby");
+            SetStatus(GetLobbyError("Failed to join lobby"));
         }
     }
 
@@ -439,8 +441,8 @@ public class MenuUI : MonoBehaviour
             {
                 m_PlayerSlotNames[i].text = players[i].IsHost
                     ? $"\u2605 {players[i].Name} (Host)"
-                    : players[i].Name;
-                m_PlayerSlotNames[i].color = players[i].IsHost ? AccentBlue : TextPrimary;
+                    : players[i].IsReady ? $"{players[i].Name}  Ready" : $"{players[i].Name}  Not ready";
+                m_PlayerSlotNames[i].color = players[i].IsHost ? AccentBlue : players[i].IsReady ? AccentGreenText : TextPrimary;
                 m_PlayerSlotBgs[i].color = players[i].IsHost ? BgPlayerRowHost : BgPlayerRow;
                 m_PlayerSlotNames[i].gameObject.SetActive(true);
                 m_PlayerSlotIcons[i].SetActive(true);
@@ -454,12 +456,84 @@ public class MenuUI : MonoBehaviour
                 m_PlayerSlotBgs[i].color = EmptySlot;
             }
         }
+
+        RefreshLobbyControls();
+    }
+
+    async void OnToggleReady()
+    {
+        if (LobbyManager.Instance == null || LobbyManager.Instance.IsHost())
+            return;
+
+        bool newReadyState = !LobbyManager.Instance.IsLocalPlayerReady();
+        SetStatus(newReadyState ? "Marking you ready..." : "Marking you not ready...");
+
+        bool success = await LobbyManager.Instance.SetLocalReady(newReadyState);
+        if (success)
+        {
+            SetStatus(newReadyState ? "Ready. Waiting for host" : "Not ready");
+        }
+        else
+        {
+            SetStatus(GetLobbyError("Could not update ready state"));
+        }
+
+        RefreshLobbyControls();
+    }
+
+    void RefreshLobbyControls()
+    {
+        if (LobbyManager.Instance == null || m_StartGameButton == null || m_ReadyButton == null)
+            return;
+
+        bool isHost = LobbyManager.Instance.IsHost();
+        bool allReady = LobbyManager.Instance.AreAllPlayersReady();
+        bool localReady = LobbyManager.Instance.IsLocalPlayerReady();
+
+        m_StartGameButton.gameObject.SetActive(isHost);
+        m_StartGameButton.interactable = isHost && allReady && !m_IsTransitioningToGameplay;
+        m_ReadyButton.gameObject.SetActive(!isHost);
+        m_ReadyButton.interactable = !m_IsTransitioningToGameplay;
+
+        if (m_ReadyButtonLabel != null)
+        {
+            m_ReadyButtonLabel.text = localReady ? "Cancel ready" : "Ready up";
+            m_ReadyButtonLabel.color = localReady ? AccentGreenText : TextPrimary;
+        }
+
+        Image startImage = m_StartGameButton.GetComponent<Image>();
+        if (startImage != null)
+        {
+            startImage.color = allReady ? AccentGreen : BgInput;
+        }
+    }
+
+    string GetLobbyError(string fallback)
+    {
+        if (LobbyManager.Instance != null && !string.IsNullOrEmpty(LobbyManager.Instance.LastErrorMessage))
+        {
+            return LobbyManager.Instance.LastErrorMessage;
+        }
+
+        if (RelayManager.Instance != null && !string.IsNullOrEmpty(RelayManager.Instance.LastErrorMessage))
+        {
+            return RelayManager.Instance.LastErrorMessage;
+        }
+
+        return fallback;
     }
 
     void OnStartGame()
     {
         if (m_IsTransitioningToGameplay)
         {
+            return;
+        }
+
+        if (LobbyManager.Instance != null && !LobbyManager.Instance.AreAllPlayersReady())
+        {
+            SetStatus("Waiting for every player to ready up");
+            RefreshLobbyControls();
             return;
         }
 
@@ -485,7 +559,7 @@ public class MenuUI : MonoBehaviour
         {
             m_IsTransitioningToGameplay = false;
             m_LoadingOverlay.Hide();
-            SetStatus("Failed to start host");
+            SetStatus(GetLobbyError("Failed to start host"));
             yield break;
         }
 
@@ -745,11 +819,16 @@ public class MenuUI : MonoBehaviour
         }
 
         m_StartGameButton = CreateButton(parent, "StartButton", "\u25B6  Start game",
-            AccentGreenText, AccentGreen, new Vector2(0f, -178f), new Vector2(390f, 48f));
+            AccentGreenText, AccentGreen, new Vector2(0f, -154f), new Vector2(390f, 44f));
         m_StartGameButton.onClick.AddListener(OnStartGame);
 
+        m_ReadyButton = CreateButton(parent, "ReadyButton", "Ready up",
+            TextPrimary, BgInput, new Vector2(0f, -204f), new Vector2(390f, 40f), BorderSubtle);
+        m_ReadyButtonLabel = m_ReadyButton.GetComponentInChildren<TextMeshProUGUI>();
+        m_ReadyButton.onClick.AddListener(OnToggleReady);
+
         Button backButton = CreateButton(parent, "LobbyBackButton", "\u2190  Leave lobby",
-            TextSecondary, BgInput, new Vector2(0f, -234f), new Vector2(390f, 40f), BorderSubtle);
+            TextSecondary, BgInput, new Vector2(0f, -254f), new Vector2(390f, 40f), BorderSubtle);
         backButton.onClick.AddListener(OnBackFromLobby);
     }
 
