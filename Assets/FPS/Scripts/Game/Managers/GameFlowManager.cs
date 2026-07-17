@@ -112,7 +112,10 @@ namespace Unity.FPS.Game
 
         float m_TimeLoadEndGameScene;
         bool m_GameIsEnding;
+        bool m_IsReturningToMenuAfterHostDisconnect;
         readonly List<TargetPracticeDummy> m_SoloTargetDummies = new List<TargetPracticeDummy>();
+
+        const string k_PendingMenuStatusKey = "NetcodeFPS.PendingMenuStatus";
 
 
         public bool GameIsEnding => m_GameIsEnding || IsMatchOver.Value;
@@ -131,12 +134,12 @@ namespace Unity.FPS.Game
             {
                 PrepareRoundCountdown();
                 IsMatchOver.Value = false;
-                if (NetworkManager.Singleton != null)
-                {
-                    NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
-                }
-
                 RefreshSoloTargetDummies();
+            }
+
+            if (NetworkManager.Singleton != null)
+            {
+                NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
             }
 
             // ALL CLIENTS: Listen for match end
@@ -285,10 +288,40 @@ namespace Unity.FPS.Game
 
         void OnClientDisconnected(ulong clientId)
         {
-            if (!IsServer)
+            if (IsServer)
+            {
+                UnregisterPlayer(clientId);
+                return;
+            }
+
+            bool serverDisconnected = NetworkManager.Singleton == null ||
+                clientId == NetworkManager.ServerClientId ||
+                !NetworkManager.Singleton.IsConnectedClient;
+
+            if (!serverDisconnected || m_IsReturningToMenuAfterHostDisconnect)
                 return;
 
-            UnregisterPlayer(clientId);
+            StartCoroutine(ReturnToMenuAfterHostDisconnect());
+        }
+
+        IEnumerator ReturnToMenuAfterHostDisconnect()
+        {
+            m_IsReturningToMenuAfterHostDisconnect = true;
+
+            PlayerPrefs.SetString(k_PendingMenuStatusKey, "Host disconnected. Match ended.");
+            PlayerPrefs.Save();
+
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+
+            if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
+            {
+                NetworkManager.Singleton.Shutdown();
+            }
+
+            yield return null;
+
+            SceneManager.LoadScene("IntroMenu");
         }
 
        
@@ -822,7 +855,7 @@ namespace Unity.FPS.Game
         public override void OnNetworkDespawn()
         {
             IsMatchOver.OnValueChanged -= OnMatchOverChanged;
-            if (IsServer && NetworkManager.Singleton != null)
+            if (NetworkManager.Singleton != null)
             {
                 NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnected;
             }

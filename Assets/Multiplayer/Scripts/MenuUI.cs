@@ -40,6 +40,7 @@ public class MenuUI : MonoBehaviour
     static readonly Color EmptySlot = new Color(1f, 1f, 1f, 0.035f);
 
     const float k_MinGameplayTransitionDuration = 1f;
+    const string k_PendingStatusMessageKey = "NetcodeFPS.PendingMenuStatus";
 
     Canvas m_Canvas;
     TMP_InputField m_PlayerNameInput;
@@ -70,6 +71,7 @@ public class MenuUI : MonoBehaviour
     string m_PlayerName;
     bool m_IsTransitioningToGameplay;
     bool m_IsTransitionCompleting;
+    bool m_IsShowingPendingStatusMessage;
 
     void Awake()
     {
@@ -83,7 +85,9 @@ public class MenuUI : MonoBehaviour
         SubscribeNetworkCallbacks();
         UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnUnitySceneLoaded;
 
-        SetStatus("Initializing services...");
+        string pendingStatus = ConsumePendingStatusMessage();
+        m_IsShowingPendingStatusMessage = !string.IsNullOrEmpty(pendingStatus);
+        SetInitialStatus(m_IsShowingPendingStatusMessage ? pendingStatus : "Initializing services...");
         CheckServicesReady();
     }
 
@@ -94,7 +98,10 @@ public class MenuUI : MonoBehaviour
             await Task.Delay(100);
         }
 
-        SetStatus("Connected and ready");
+        if (!m_IsShowingPendingStatusMessage)
+        {
+            SetStatus("Connected and ready");
+        }
     }
 
     void SubscribeNetworkCallbacks()
@@ -108,6 +115,8 @@ public class MenuUI : MonoBehaviour
         {
             NetworkManager.Singleton.SceneManager.OnSceneEvent += OnNetworkSceneEvent;
         }
+
+        NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
     }
 
     void UnsubscribeNetworkCallbacks()
@@ -120,6 +129,35 @@ public class MenuUI : MonoBehaviour
         if (NetworkManager.Singleton.SceneManager != null)
         {
             NetworkManager.Singleton.SceneManager.OnSceneEvent -= OnNetworkSceneEvent;
+        }
+
+        NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnected;
+    }
+
+    void OnClientDisconnected(ulong clientId)
+    {
+        if (NetworkManager.Singleton == null || NetworkManager.Singleton.IsHost)
+        {
+            return;
+        }
+
+        bool serverDisconnected = clientId == NetworkManager.ServerClientId ||
+            !NetworkManager.Singleton.IsConnectedClient;
+        if (!serverDisconnected)
+        {
+            return;
+        }
+
+        m_IsTransitioningToGameplay = false;
+        m_IsTransitionCompleting = false;
+        HideLoading();
+        ShowScreen(MenuScreenState.ModeSelect);
+        SetStatus("Host disconnected. Match ended.");
+        UnlockCursor();
+
+        if (NetworkManager.Singleton.IsListening)
+        {
+            NetworkManager.Singleton.Shutdown();
         }
     }
 
@@ -482,10 +520,43 @@ public class MenuUI : MonoBehaviour
 
     void SetStatus(string message)
     {
+        m_IsShowingPendingStatusMessage = false;
         if (m_StatusText != null)
         {
             m_StatusText.text = message;
         }
+    }
+
+    void SetInitialStatus(string message)
+    {
+        if (m_StatusText != null)
+        {
+            m_StatusText.text = message;
+        }
+    }
+
+    public static void QueuePendingStatusMessage(string message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return;
+        }
+
+        PlayerPrefs.SetString(k_PendingStatusMessageKey, message);
+        PlayerPrefs.Save();
+    }
+
+    static string ConsumePendingStatusMessage()
+    {
+        if (!PlayerPrefs.HasKey(k_PendingStatusMessageKey))
+        {
+            return null;
+        }
+
+        string message = PlayerPrefs.GetString(k_PendingStatusMessageKey);
+        PlayerPrefs.DeleteKey(k_PendingStatusMessageKey);
+        PlayerPrefs.Save();
+        return message;
     }
 
     void BuildUI()
