@@ -275,6 +275,11 @@ public class LobbyManager : MonoBehaviour
         OnLobbyPlayersChanged?.Invoke(players);
     }
 
+    public void RefreshPlayersSnapshot()
+    {
+        NotifyPlayersChanged();
+    }
+
     string BuildLobbyPlayersState(Lobby lobby)
     {
         if (lobby == null || lobby.Players == null)

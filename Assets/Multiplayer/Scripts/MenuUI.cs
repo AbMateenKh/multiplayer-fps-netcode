@@ -84,6 +84,7 @@ public class MenuUI : MonoBehaviour
     bool m_IsTransitionCompleting;
     bool m_IsShowingPendingStatusMessage;
     bool m_IsDestroyed;
+    bool m_NetworkSceneEventsSubscribed;
 
     void Awake()
     {
@@ -105,6 +106,7 @@ public class MenuUI : MonoBehaviour
 
     void Update()
     {
+        EnsureNetworkSceneSubscription();
         m_Toolkit?.Tick(Time.unscaledTime);
         if (m_Toolkit != null && m_Toolkit.IsRenderable && m_Canvas != null && m_Canvas.enabled)
         {
@@ -132,12 +134,21 @@ public class MenuUI : MonoBehaviour
             return;
         }
 
-        if (NetworkManager.Singleton.SceneManager != null)
+        EnsureNetworkSceneSubscription();
+        NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
+    }
+
+    void EnsureNetworkSceneSubscription()
+    {
+        if (m_NetworkSceneEventsSubscribed ||
+            NetworkManager.Singleton == null ||
+            NetworkManager.Singleton.SceneManager == null)
         {
-            NetworkManager.Singleton.SceneManager.OnSceneEvent += OnNetworkSceneEvent;
+            return;
         }
 
-        NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
+        NetworkManager.Singleton.SceneManager.OnSceneEvent += OnNetworkSceneEvent;
+        m_NetworkSceneEventsSubscribed = true;
     }
 
     void UnsubscribeNetworkCallbacks()
@@ -147,10 +158,11 @@ public class MenuUI : MonoBehaviour
             return;
         }
 
-        if (NetworkManager.Singleton.SceneManager != null)
+        if (m_NetworkSceneEventsSubscribed && NetworkManager.Singleton.SceneManager != null)
         {
             NetworkManager.Singleton.SceneManager.OnSceneEvent -= OnNetworkSceneEvent;
         }
+        m_NetworkSceneEventsSubscribed = false;
 
         NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnected;
     }
@@ -220,7 +232,12 @@ public class MenuUI : MonoBehaviour
             return;
         }
 
-        if (!m_IsTransitioningToGameplay || m_IsTransitionCompleting)
+        if (!m_IsTransitioningToGameplay)
+        {
+            BeginGameplayTransition("Deploying To Arena", "Synchronizing with the host...");
+        }
+
+        if (m_IsTransitionCompleting)
         {
             return;
         }
@@ -274,6 +291,7 @@ public class MenuUI : MonoBehaviour
         m_Toolkit?.SetLobbyHeader(isPrivate, m_LobbyCode, 1, maxPlayers);
         RefreshLobbyControls();
         ShowScreen(MenuScreenState.Lobby);
+        LobbyManager.Instance?.RefreshPlayersSnapshot();
     }
 
     void ShowLoading(string title, string message, float progress)
