@@ -1,0 +1,166 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <Style src="Theme.uss" />
+    <Style src="Menu.uss" />
+    <ui:VisualElement name="menu-root" class="app menu-app">
+        <ui:VisualElement class="grid">
+            <ui:VisualElement class="grid__vertical v-1" /><ui:VisualElement class="grid__vertical v-2" />
+            <ui:VisualElement class="grid__vertical v-3" /><ui:VisualElement class="grid__vertical v-4" />
+            <ui:VisualElement class="grid__vertical v-5" /><ui:VisualElement class="grid__vertical v-6" />
+            <ui:VisualElement class="grid__vertical v-7" />
+            <ui:VisualElement class="grid__horizontal h-1" /><ui:VisualElement class="grid__horizontal h-2" />
+            <ui:VisualElement class="grid__horizontal h-3" /><ui:VisualElement class="grid__horizontal h-4" />
+            <ui:VisualElement class="grid__horizontal h-5" />
+        </ui:VisualElement>
+        <ui:VisualElement name="menu-scan-sweep" class="menu-scan-sweep" />
+        <ui:VisualElement class="corner corner--tl" /><ui:VisualElement class="corner corner--tr" />
+        <ui:VisualElement class="corner corner--bl" /><ui:VisualElement class="corner corner--br" />
+
+        <ui:VisualElement class="menu-topbar">
+            <ui:VisualElement class="identity">
+                <ui:Label text="07" class="identity__badge" />
+                <ui:VisualElement>
+                    <ui:Label text="OPERATIVE-07" class="identity__name" />
+                    <ui:Label text="RANK 14 · 1,204 XP" class="copy" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+            <ui:Label text="LOCAL READY / RELAY AVAILABLE" class="connection" />
+        </ui:VisualElement>
+
+        <ui:VisualElement name="landing-screen" class="screen menu-screen">
+            <ui:VisualElement class="landing">
+                <ui:Label text="VANGUARD&#10;PROTOCOL" class="wordmark" />
+                <ui:Label text="OFFLINE TRAINING / 4-PLAYER ONLINE DEATHMATCH" class="tagline" />
+                <ui:VisualElement class="button-row landing__actions">
+                    <ui:Button name="single-player-button" text="SINGLE PLAYER" class="button button--primary landing__mode" />
+                    <ui:Button name="multiplayer-button" text="MULTIPLAYER" class="button landing__mode" />
+                    <ui:Button name="settings-button" text="SETTINGS" class="button landing__settings" />
+                    <ui:Button name="exit-button" text="EXIT" class="button button--quiet landing__exit" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+            <ui:Label text="BUILD 0.4.12 · PROTOTYPE ART PASS" class="build-label" />
+        </ui:VisualElement>
+
+        <ui:VisualElement name="mode-screen" class="screen menu-screen hidden">
+            <ui:Button name="mode-back-button" text="‹  BACK" class="back-button" />
+            <ui:VisualElement class="screen-heading">
+                <ui:Label text="MULTIPLAYER" class="eyebrow" />
+                <ui:Label text="Select Match Type" class="title" />
+            </ui:VisualElement>
+            <ui:VisualElement class="callsign-row">
+                <ui:VisualElement class="callsign-field">
+                    <ui:Label text="CALLSIGN" class="micro" />
+                    <ui:TextField name="player-name-field" value="Player" class="field" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement class="mode-tabs">
+                <ui:Button name="public-button" text="CREATE PUBLIC" class="mode-tab" />
+                <ui:Button name="private-button" text="CREATE PRIVATE" class="mode-tab" />
+                <ui:Button name="join-code-button" text="JOIN CODE" class="mode-tab mode-tab--active" />
+                <ui:Button name="quick-join-button" text="QUICK JOIN" class="mode-tab mode-tab--last" />
+            </ui:VisualElement>
+            <ui:VisualElement class="mode-information panel">
+                <ui:Label text="CHOOSE HOW YOUR SQUAD CONNECTS" class="eyebrow mode-information__eyebrow" />
+                <ui:Label text="Public matchmaking finds an open arena. Private matches create a direct six-character invite code." class="mode-information__title" />
+                <ui:Label text="LOBBY CAPACITY 4 · HOST DEPLOYS WHEN EVERY CLIENT IS READY" class="micro" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement name="join-screen" class="screen menu-screen hidden">
+            <ui:Button name="join-back-button" text="‹  BACK" class="back-button" />
+            <ui:VisualElement class="screen-heading">
+                <ui:Label text="MULTIPLAYER" class="eyebrow" />
+                <ui:Label text="Join Private Lobby" class="title" />
+            </ui:VisualElement>
+            <ui:VisualElement class="join-panel panel">
+                <ui:Label text="ENTER 6-CHARACTER LOBBY CODE" class="join-panel__label" />
+                <ui:TextField name="join-code-field" max-length="6" class="field code-field" />
+                <ui:Button name="join-button" text="JOIN LOBBY" class="button button--primary join-panel__button" />
+                <ui:Label text="NO CODE? RETURN AND USE QUICK JOIN FOR AN OPEN PUBLIC LOBBY" class="micro" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement name="lobby-screen" class="screen menu-screen hidden">
+            <ui:VisualElement class="lobby-heading">
+                <ui:VisualElement>
+                    <ui:Label name="lobby-type" text="PRIVATE LOBBY" class="eyebrow" />
+                    <ui:VisualElement name="lobby-code-section" class="lobby-code-row">
+                        <ui:Label name="lobby-code" text="------" class="lobby-code" />
+                        <ui:Button name="copy-code-button" text="COPY" class="button lobby-copy" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+                <ui:VisualElement class="lobby-map">
+                    <ui:Label text="MAP" class="micro" />
+                    <ui:Label text="BLACKWATER YARD" class="lobby-map__name" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+            <ui:Label name="player-count" text="PLAYERS 1/4" class="player-count" />
+            <ui:VisualElement name="player-grid" class="player-grid">
+                <ui:VisualElement name="player-slot-0" class="player-slot" />
+                <ui:VisualElement name="player-slot-1" class="player-slot" />
+                <ui:VisualElement name="player-slot-2" class="player-slot" />
+                <ui:VisualElement name="player-slot-3" class="player-slot" />
+            </ui:VisualElement>
+            <ui:VisualElement class="lobby-actions">
+                <ui:Button name="ready-button" text="READY UP" class="button button--green" />
+                <ui:Button name="leave-lobby-button" text="LEAVE LOBBY" class="button" />
+                <ui:VisualElement class="lobby-actions__spacer" />
+                <ui:Button name="start-match-button" text="START MATCH" class="button button--primary start-match" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement name="settings-screen" class="screen menu-screen hidden">
+            <ui:VisualElement class="settings-shell panel">
+                <ui:VisualElement class="settings-heading">
+                    <ui:Label text="SYSTEM" class="eyebrow" />
+                    <ui:Label text="Settings" class="title" />
+                </ui:VisualElement>
+                <ui:VisualElement class="settings-tabs">
+                    <ui:Label text="GAMEPLAY" class="settings-tab settings-tab--active" />
+                    <ui:Label text="AUDIO" class="settings-tab" />
+                    <ui:Label text="VIDEO" class="settings-tab" />
+                </ui:VisualElement>
+                <ui:VisualElement class="settings-body">
+                    <ui:VisualElement class="setting-row">
+                        <ui:Label text="Mouse Sensitivity" class="setting-row__label" />
+                        <ui:VisualElement class="stepper">
+                            <ui:Button name="menu-sensitivity-minus" text="−" class="stepper__button" />
+                            <ui:Label name="menu-sensitivity-value" text="1.0" class="value stepper__value" />
+                            <ui:Button name="menu-sensitivity-plus" text="+" class="stepper__button" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                    <ui:VisualElement class="setting-row">
+                        <ui:Label text="Master Volume" class="setting-row__label" />
+                        <ui:VisualElement class="stepper">
+                            <ui:Button name="menu-volume-minus" text="−" class="stepper__button" />
+                            <ui:Label name="menu-volume-value" text="100%" class="value stepper__value" />
+                            <ui:Button name="menu-volume-plus" text="+" class="stepper__button" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                    <ui:Button name="menu-fullscreen-button" text="TOGGLE FULLSCREEN" class="setting-row setting-row--button" />
+                </ui:VisualElement>
+                <ui:VisualElement class="settings-footer">
+                    <ui:Button name="settings-back-button" text="BACK" class="button button--primary" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement name="loading-screen" class="loading-overlay hidden">
+            <ui:VisualElement class="loading-content">
+                <ui:Label name="loading-title" text="DEPLOYING TO ARENA" class="loading-title" />
+                <ui:Label name="loading-message" text="Synchronizing squad state" class="copy loading-message" />
+                <ui:VisualElement class="loading-track">
+                    <ui:VisualElement name="loading-progress" class="loading-progress">
+                        <ui:VisualElement name="loading-spark" class="loading-spark" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+                <ui:Label name="loading-percent" text="0%" class="value loading-percent" />
+                <ui:Label text="TIP · MOVE WITH YOUR SQUAD AND CONTROL THE PICKUP LANES" class="micro loading-tip" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement class="status-footer">
+            <ui:VisualElement class="status-dot" />
+            <ui:Label name="status-label" text="INITIALIZING SERVICES" class="status-label" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

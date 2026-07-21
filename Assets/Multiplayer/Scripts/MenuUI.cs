@@ -2,7 +2,10 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using TMPro;
+using Unity.FPS.Game;
+using Unity.FPS.Gameplay;
 using Unity.Netcode;
+using Unity.Netcode.Transports.UTP;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -13,34 +16,36 @@ public class MenuUI : MonoBehaviour
         Landing,
         ModeSelect,
         Join,
-        Lobby
+        Lobby,
+        Settings
     }
 
     [Header("Settings")]
     public string GameSceneName = "MainScene";
     public int MaxPlayers = 4;
+    public ushort OfflinePort = 7777;
 
-    static readonly Color BgPrimary = new Color(0.04f, 0.05f, 0.08f);
-    static readonly Color BgSurface = new Color(0.07f, 0.09f, 0.13f, 0.94f);
-    static readonly Color BgInput = new Color(0.11f, 0.13f, 0.18f);
-    static readonly Color BgPlayerRow = new Color(0.1f, 0.12f, 0.16f, 0.92f);
-    static readonly Color BgPlayerRowHost = new Color(0.2f, 0.57f, 0.93f, 0.16f);
-    static readonly Color AccentBlue = new Color(0.37f, 0.78f, 1f);
-    static readonly Color AccentBlueDark = new Color(0.08f, 0.34f, 0.58f);
-    static readonly Color AccentOrange = new Color(0.98f, 0.54f, 0.16f);
-    static readonly Color AccentOrangeText = new Color(1f, 0.94f, 0.88f);
-    static readonly Color AccentGreen = new Color(0.23f, 0.5f, 0.16f);
-    static readonly Color AccentGreenText = new Color(0.91f, 0.98f, 0.88f);
-    static readonly Color AccentPink = new Color(0.94f, 0.27f, 0.47f, 0.22f);
-    static readonly Color TextPrimary = new Color(0.94f, 0.97f, 1f);
-    static readonly Color TextSecondary = new Color(0.57f, 0.63f, 0.72f);
-    static readonly Color TextDim = new Color(0.33f, 0.39f, 0.47f);
-    static readonly Color BorderSubtle = new Color(1f, 1f, 1f, 0.08f);
-    static readonly Color BorderFocus = new Color(0.37f, 0.78f, 1f, 0.45f);
-    static readonly Color EmptySlot = new Color(1f, 1f, 1f, 0.035f);
+    static readonly Color BgPrimary = VanguardUITheme.Base;
+    static readonly Color BgSurface = VanguardUITheme.Panel;
+    static readonly Color BgInput = VanguardUITheme.PanelSoft;
+    static readonly Color BgPlayerRow = new Color32(18, 23, 29, 236);
+    static readonly Color BgPlayerRowHost = VanguardUITheme.AmberSoft;
+    static readonly Color AccentBlue = VanguardUITheme.Amber;
+    static readonly Color AccentBlueDark = VanguardUITheme.Amber;
+    static readonly Color AccentOrange = VanguardUITheme.Amber;
+    static readonly Color AccentOrangeText = new Color32(26, 18, 6, 255);
+    static readonly Color AccentGreen = VanguardUITheme.GreenSoft;
+    static readonly Color AccentGreenText = VanguardUITheme.Green;
+    static readonly Color TextPrimary = VanguardUITheme.Ink;
+    static readonly Color TextSecondary = VanguardUITheme.InkDim;
+    static readonly Color TextDim = VanguardUITheme.InkFaint;
+    static readonly Color BorderSubtle = VanguardUITheme.Border;
+    static readonly Color BorderFocus = VanguardUITheme.BorderStrong;
+    static readonly Color EmptySlot = new Color32(243, 242, 242, 8);
 
     const float k_MinGameplayTransitionDuration = 1f;
     const string k_PendingStatusMessageKey = "NetcodeFPS.PendingMenuStatus";
+    const string k_MasterVolumePrefsKey = "NetcodeFPS.MasterVolume";
 
     Canvas m_Canvas;
     TMP_InputField m_PlayerNameInput;
@@ -54,12 +59,16 @@ public class MenuUI : MonoBehaviour
     AnimatedMenuPanel m_MainMenuPanel;
     AnimatedMenuPanel m_LobbyPanel;
     AnimatedMenuPanel m_JoinPanel;
+    AnimatedMenuPanel m_SettingsPanel;
     MenuLoadingOverlay m_LoadingOverlay;
+    VanguardMenuToolkit m_Toolkit;
 
     GameObject m_LobbyCodeSection;
     Button m_StartGameButton;
     Button m_ReadyButton;
     TextMeshProUGUI m_ReadyButtonLabel;
+    TextMeshProUGUI m_MenuSensitivityValue;
+    TextMeshProUGUI m_MenuVolumeValue;
 
     readonly List<GameObject> m_PlayerSlots = new List<GameObject>();
     readonly List<TextMeshProUGUI> m_PlayerSlotNames = new List<TextMeshProUGUI>();
@@ -74,6 +83,7 @@ public class MenuUI : MonoBehaviour
     bool m_IsTransitioningToGameplay;
     bool m_IsTransitionCompleting;
     bool m_IsShowingPendingStatusMessage;
+    bool m_IsDestroyed;
 
     void Awake()
     {
@@ -93,14 +103,23 @@ public class MenuUI : MonoBehaviour
         CheckServicesReady();
     }
 
+    void Update()
+    {
+        m_Toolkit?.Tick(Time.unscaledTime);
+        if (m_Toolkit != null && m_Toolkit.IsRenderable && m_Canvas != null && m_Canvas.enabled)
+        {
+            m_Canvas.enabled = false;
+        }
+    }
+
     async void CheckServicesReady()
     {
-        while (!ServicesInitializer.IsInitialized)
+        while (!ServicesInitializer.IsInitialized && !m_IsDestroyed)
         {
             await Task.Delay(100);
         }
 
-        if (!m_IsShowingPendingStatusMessage)
+        if (!m_IsDestroyed && !m_IsShowingPendingStatusMessage)
         {
             SetStatus("Connected and ready");
         }
@@ -179,12 +198,14 @@ public class MenuUI : MonoBehaviour
 
             m_LoadingOverlay.SetMessage("Streaming arena geometry...");
             m_LoadingOverlay.SetProgress(0.7f);
+            m_Toolkit?.SetLoading("Deploying To Arena", "Streaming arena geometry...", 0.7f);
         }
         else if (sceneEvent.SceneEventType == SceneEventType.LoadComplete &&
                  sceneEvent.ClientId == NetworkManager.Singleton.LocalClientId)
         {
             m_LoadingOverlay.SetMessage("Scene loaded. Finalizing spawn state...");
             m_LoadingOverlay.SetProgress(0.88f);
+            m_Toolkit?.SetLoading("Deploying To Arena", "Scene loaded. Finalizing spawn state...", 0.88f);
         }
         else if (sceneEvent.SceneEventType == SceneEventType.LoadEventCompleted && !m_IsTransitionCompleting)
         {
@@ -206,6 +227,7 @@ public class MenuUI : MonoBehaviour
 
         m_LoadingOverlay.SetMessage("Scene activated. Finalizing deployment...");
         m_LoadingOverlay.SetProgress(0.96f);
+        m_Toolkit?.SetLoading("Deploying To Arena", "Scene activated. Finalizing deployment...", 0.96f);
         StartCoroutine(FinishGameplayTransition());
     }
 
@@ -217,6 +239,8 @@ public class MenuUI : MonoBehaviour
         TogglePanel(m_MainMenuPanel, state == MenuScreenState.ModeSelect, instant);
         TogglePanel(m_JoinPanel, state == MenuScreenState.Join, instant);
         TogglePanel(m_LobbyPanel, state == MenuScreenState.Lobby, instant);
+        TogglePanel(m_SettingsPanel, state == MenuScreenState.Settings, instant);
+        m_Toolkit?.ShowScreen(state.ToString());
 
         if (!m_IsTransitioningToGameplay)
         {
@@ -245,7 +269,9 @@ public class MenuUI : MonoBehaviour
     {
         m_IsPrivateLobby = isPrivate;
         m_LobbyCodeSection.SetActive(isPrivate);
-        m_LobbyTypeText.text = isPrivate ? "Private squad lobby" : "Public squad lobby";
+        m_LobbyTypeText.text = isPrivate ? "PRIVATE LOBBY" : "PUBLIC LOBBY";
+        int maxPlayers = LobbyManager.Instance != null ? LobbyManager.Instance.GetMaxPlayers() : MaxPlayers;
+        m_Toolkit?.SetLobbyHeader(isPrivate, m_LobbyCode, 1, maxPlayers);
         RefreshLobbyControls();
         ShowScreen(MenuScreenState.Lobby);
     }
@@ -254,6 +280,7 @@ public class MenuUI : MonoBehaviour
     {
         m_LoadingOverlay.Show(title, message);
         m_LoadingOverlay.SetProgress(progress);
+        m_Toolkit?.ShowLoading(title, message, progress);
     }
 
     void HideLoading()
@@ -261,6 +288,7 @@ public class MenuUI : MonoBehaviour
         if (!m_IsTransitioningToGameplay)
         {
             m_LoadingOverlay.Hide();
+            m_Toolkit?.HideLoading();
         }
     }
 
@@ -271,6 +299,7 @@ public class MenuUI : MonoBehaviour
         m_LoadingOverlay.SetTitle(title);
         m_LoadingOverlay.SetMessage(message);
         m_LoadingOverlay.SetProgress(0.18f);
+        m_Toolkit?.ShowLoading(title, message, 0.18f);
     }
 
     IEnumerator FinishGameplayTransition()
@@ -279,6 +308,7 @@ public class MenuUI : MonoBehaviour
         m_LoadingOverlay.SetTitle("Arena Ready");
         m_LoadingOverlay.SetMessage("Drop sequence complete...");
         m_LoadingOverlay.SetProgress(1f);
+        m_Toolkit?.SetLoading("Arena Ready", "Drop sequence complete...", 1f);
 
         while (!m_LoadingOverlay.HasMetMinimumVisibleTime(k_MinGameplayTransitionDuration))
         {
@@ -296,7 +326,9 @@ public class MenuUI : MonoBehaviour
 
     string GetPlayerName()
     {
-        m_PlayerName = m_PlayerNameInput.text.Trim();
+        m_PlayerName = m_Toolkit != null && !string.IsNullOrWhiteSpace(m_Toolkit.PlayerName)
+            ? m_Toolkit.PlayerName
+            : m_PlayerNameInput.text.Trim();
         if (string.IsNullOrEmpty(m_PlayerName))
         {
             m_PlayerName = "Player";
@@ -308,7 +340,163 @@ public class MenuUI : MonoBehaviour
     void OnOpenMainMenu()
     {
         ShowScreen(MenuScreenState.ModeSelect);
-        SetStatus("Choose a lobby flow");
+        SetStatus("Select a match type");
+    }
+
+    void OnStartSinglePlayer()
+    {
+        if (m_IsTransitioningToGameplay)
+        {
+            return;
+        }
+
+        StartCoroutine(StartSinglePlayerTransitionRoutine());
+    }
+
+    IEnumerator StartSinglePlayerTransitionRoutine()
+    {
+        BeginGameplayTransition("Local Deployment", "Preparing solo combat simulation...");
+        SetStatus("Starting single player...");
+
+        yield return new WaitForSecondsRealtime(0.25f);
+
+        NetworkManager networkManager = NetworkManager.Singleton;
+        if (networkManager == null)
+        {
+            CancelGameplayTransition("Network bootstrap is missing");
+            yield break;
+        }
+
+        if (networkManager.IsListening)
+        {
+            networkManager.Shutdown();
+            yield return null;
+        }
+
+        UnityTransport transport = networkManager.GetComponent<UnityTransport>();
+        if (transport == null)
+        {
+            CancelGameplayTransition("Unity Transport is missing");
+            yield break;
+        }
+
+        m_LoadingOverlay.SetMessage("Starting local authority...");
+        m_LoadingOverlay.SetProgress(0.38f);
+        m_Toolkit?.SetLoading("Local Deployment", "Starting local authority...", 0.38f);
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+        float servicesTimeout = Time.realtimeSinceStartup + 12f;
+        while (!ServicesInitializer.IsInitialized && Time.realtimeSinceStartup < servicesTimeout)
+        {
+            yield return null;
+        }
+
+        if (!ServicesInitializer.IsInitialized || RelayManager.Instance == null)
+        {
+            CancelGameplayTransition("Online services are required for solo play in a browser");
+            yield break;
+        }
+
+        m_LoadingOverlay.SetMessage("Opening secure browser session...");
+        m_Toolkit?.SetLoading("Local Deployment", "Opening secure browser session...", 0.45f);
+        Task<string> relayTask = RelayManager.Instance.CreateRelay(1);
+        while (!relayTask.IsCompleted)
+        {
+            yield return null;
+        }
+
+        if (relayTask.IsFaulted || string.IsNullOrEmpty(relayTask.Result))
+        {
+            CancelGameplayTransition(RelayManager.Instance.LastErrorMessage);
+            yield break;
+        }
+#else
+        transport.UseWebSockets = false;
+        transport.SetConnectionData(true, "127.0.0.1", OfflinePort, "127.0.0.1");
+        if (!networkManager.StartHost())
+        {
+            CancelGameplayTransition($"Could not start the local session on port {OfflinePort}");
+            yield break;
+        }
+#endif
+
+        yield return new WaitForSecondsRealtime(0.15f);
+
+        m_LoadingOverlay.SetMessage("Loading combat zone...");
+        m_LoadingOverlay.SetProgress(0.55f);
+        m_Toolkit?.SetLoading("Local Deployment", "Loading combat zone...", 0.55f);
+        networkManager.SceneManager.LoadScene(
+            GameSceneName,
+            UnityEngine.SceneManagement.LoadSceneMode.Single);
+    }
+
+    void CancelGameplayTransition(string message)
+    {
+        m_IsTransitioningToGameplay = false;
+        m_IsTransitionCompleting = false;
+        m_LoadingOverlay.Hide();
+        m_Toolkit?.HideLoading();
+        SetStatus(message);
+        UnlockCursor();
+    }
+
+    void OnOpenSettings()
+    {
+        RefreshMenuSettings();
+        ShowScreen(MenuScreenState.Settings);
+        SetStatus("Settings saved automatically");
+    }
+
+    void OnExitGame()
+    {
+#if UNITY_EDITOR
+        Debug.Log("[Menu] Exit requested. Application.Quit is ignored in the editor.");
+#else
+        Application.Quit();
+#endif
+    }
+
+    void AdjustMenuSensitivity(float delta)
+    {
+        float current = PlayerPrefs.GetFloat(PlayerInputHandler.LookSensitivityPrefsKey, 1f);
+        PlayerPrefs.SetFloat(PlayerInputHandler.LookSensitivityPrefsKey, Mathf.Clamp(current + delta, 0.2f, 3f));
+        PlayerPrefs.Save();
+        RefreshMenuSettings();
+    }
+
+    void AdjustMenuVolume(float delta)
+    {
+        float current = PlayerPrefs.GetFloat(k_MasterVolumePrefsKey, AudioUtility.GetMasterVolume());
+        float next = Mathf.Clamp01(current + delta);
+        AudioUtility.SetMasterVolume(next);
+        PlayerPrefs.SetFloat(k_MasterVolumePrefsKey, next);
+        PlayerPrefs.Save();
+        RefreshMenuSettings();
+    }
+
+    void ToggleMenuFullscreen()
+    {
+        Screen.fullScreen = !Screen.fullScreen;
+        RefreshMenuSettings();
+    }
+
+    void RefreshMenuSettings()
+    {
+        if (m_MenuSensitivityValue != null)
+        {
+            m_MenuSensitivityValue.text =
+                PlayerPrefs.GetFloat(PlayerInputHandler.LookSensitivityPrefsKey, 1f).ToString("0.0");
+        }
+
+        if (m_MenuVolumeValue != null)
+        {
+            float volume = PlayerPrefs.GetFloat(k_MasterVolumePrefsKey, AudioUtility.GetMasterVolume());
+            m_MenuVolumeValue.text = $"{Mathf.RoundToInt(volume * 100f)}%";
+        }
+
+        float toolkitSensitivity = PlayerPrefs.GetFloat(PlayerInputHandler.LookSensitivityPrefsKey, 1f);
+        float toolkitVolume = PlayerPrefs.GetFloat(k_MasterVolumePrefsKey, AudioUtility.GetMasterVolume());
+        m_Toolkit?.SetSettings(toolkitSensitivity, toolkitVolume);
     }
 
     void OnReturnToLanding()
@@ -403,7 +591,9 @@ public class MenuUI : MonoBehaviour
 
     async void OnJoinByCode()
     {
-        string code = m_LobbyCodeInput.text.Trim().ToUpper();
+        string code = m_Toolkit != null && !string.IsNullOrWhiteSpace(m_Toolkit.JoinCode)
+            ? m_Toolkit.JoinCode
+            : m_LobbyCodeInput.text.Trim().ToUpper();
         if (string.IsNullOrEmpty(code))
         {
             SetStatus("Enter a lobby code");
@@ -433,7 +623,9 @@ public class MenuUI : MonoBehaviour
     void OnLobbyPlayersChanged(List<PlayerLobbyData> players)
     {
         int max = LobbyManager.Instance.GetMaxPlayers();
-        m_PlayerCountText.text = $"Players ({players.Count}/{max})";
+        m_PlayerCountText.text = $"PLAYERS {players.Count}/{max}";
+        m_Toolkit?.SetLobbyHeader(m_IsPrivateLobby, m_LobbyCode, players.Count, max);
+        m_Toolkit?.SetPlayers(players, max);
 
         for (int i = 0; i < m_PlayerSlots.Count; i++)
         {
@@ -497,15 +689,24 @@ public class MenuUI : MonoBehaviour
 
         if (m_ReadyButtonLabel != null)
         {
-            m_ReadyButtonLabel.text = localReady ? "Cancel ready" : "Ready up";
+            m_ReadyButtonLabel.text = localReady ? "CANCEL READY" : "READY UP";
             m_ReadyButtonLabel.color = localReady ? AccentGreenText : TextPrimary;
         }
 
         Image startImage = m_StartGameButton.GetComponent<Image>();
         if (startImage != null)
         {
-            startImage.color = allReady ? AccentGreen : BgInput;
+            startImage.color = allReady ? AccentOrange : BgInput;
         }
+
+        TextMeshProUGUI startLabel = m_StartGameButton.GetComponentInChildren<TextMeshProUGUI>();
+        if (startLabel != null)
+        {
+            startLabel.text = isHost && !allReady ? "WAITING FOR READY PLAYERS" : "START MATCH";
+            startLabel.color = allReady ? AccentOrangeText : TextSecondary;
+        }
+
+        m_Toolkit?.SetLobbyControls(isHost, allReady, localReady, m_IsTransitioningToGameplay);
     }
 
     string GetLobbyError(string fallback)
@@ -553,6 +754,7 @@ public class MenuUI : MonoBehaviour
         yield return new WaitForSecondsRealtime(0.35f);
         m_LoadingOverlay.SetMessage("Starting host authority...");
         m_LoadingOverlay.SetProgress(0.32f);
+        m_Toolkit?.SetLoading("Opening Drop Corridor", "Starting host authority...", 0.32f);
 
         bool hostStarted = NetworkManager.Singleton.IsHost || NetworkManager.Singleton.StartHost();
         if (!hostStarted)
@@ -566,6 +768,7 @@ public class MenuUI : MonoBehaviour
         yield return new WaitForSecondsRealtime(0.2f);
         m_LoadingOverlay.SetMessage("Loading combat zone...");
         m_LoadingOverlay.SetProgress(0.46f);
+        m_Toolkit?.SetLoading("Deploying To Arena", "Loading combat zone...", 0.46f);
         NetworkManager.Singleton.SceneManager.LoadScene(GameSceneName, UnityEngine.SceneManagement.LoadSceneMode.Single);
     }
 
@@ -599,6 +802,7 @@ public class MenuUI : MonoBehaviour
         {
             m_StatusText.text = message;
         }
+        m_Toolkit?.SetStatus(message);
     }
 
     void SetInitialStatus(string message)
@@ -607,6 +811,7 @@ public class MenuUI : MonoBehaviour
         {
             m_StatusText.text = message;
         }
+        m_Toolkit?.SetStatus(message);
     }
 
     public static void QueuePendingStatusMessage(string message)
@@ -642,34 +847,39 @@ public class MenuUI : MonoBehaviour
         m_Canvas.sortingOrder = 200;
 
         var scaler = canvasObj.AddComponent<CanvasScaler>();
-        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1920, 1080);
-        scaler.matchWidthOrHeight = 0.5f;
+        VanguardUITheme.ConfigureScaler(scaler);
 
         canvasObj.AddComponent<GraphicRaycaster>();
 
         BuildAnimatedBackground(canvasObj);
-        BuildHeader(canvasObj);
+        GameObject safeArea = VanguardUITheme.CreateSafeArea(canvasObj);
+        VanguardUITheme.AddCornerFrame(safeArea);
+        BuildHeader(safeArea);
 
-        m_LandingPanel = CreateAnimatedCard(canvasObj, "LandingPanel", new Vector2(0, 30), new Vector2(700, 360));
+        m_LandingPanel = CreateAnimatedCard(safeArea, "LandingPanel", new Vector2(0, -16), new Vector2(1660, 650));
         BuildLandingPanel(m_LandingPanel.gameObject);
 
-        m_MainMenuPanel = CreateAnimatedCard(canvasObj, "MainMenuPanel", new Vector2(0, 40), new Vector2(440, 430));
+        m_MainMenuPanel = CreateAnimatedCard(safeArea, "MainMenuPanel", new Vector2(0, -12), new Vector2(1660, 770));
         BuildMainMenu(m_MainMenuPanel.gameObject);
 
-        m_LobbyPanel = CreateAnimatedCard(canvasObj, "LobbyPanel", new Vector2(0, 20), new Vector2(460, 520));
+        m_LobbyPanel = CreateAnimatedCard(safeArea, "LobbyPanel", new Vector2(0, -8), new Vector2(1660, 800));
         BuildLobbyPanel(m_LobbyPanel.gameObject);
 
-        m_JoinPanel = CreateAnimatedCard(canvasObj, "JoinPanel", new Vector2(0, 40), new Vector2(430, 320));
+        m_JoinPanel = CreateAnimatedCard(safeArea, "JoinPanel", new Vector2(0, -12), new Vector2(1660, 770));
         BuildJoinPanel(m_JoinPanel.gameObject);
 
+        m_SettingsPanel = CreateAnimatedCard(safeArea, "SettingsPanel", new Vector2(0, -8), new Vector2(1280, 770));
+        BuildSettingsPanel(m_SettingsPanel.gameObject);
+
         BuildLoadingOverlay(canvasObj);
-        BuildStatusBar(canvasObj);
+        BuildStatusBar(safeArea);
+
+        m_Toolkit = new VanguardMenuToolkit(this);
     }
 
     void BuildAnimatedBackground(GameObject canvas)
     {
-        CreatePanel(canvas, "BackgroundBase", BgPrimary, Vector2.zero, new Vector2(1920, 1080));
+        CreatePanel(canvas, "BackgroundBase", BgPrimary, Vector2.zero, new Vector2(2400, 1400));
 
         GameObject grid = CreateContainer(canvas, "Grid", Vector2.zero, new Vector2(1920, 1080));
         for (int i = -4; i <= 4; i++)
@@ -682,25 +892,8 @@ public class MenuUI : MonoBehaviour
             CreateImage(grid, $"GridH_{i}", new Color(1f, 1f, 1f, 0.03f), new Vector2(0f, i * 150f), new Vector2(1920f, 1f));
         }
 
-        CreateAmbientBand(canvas, "GlowBandA", new Color(0.1f, 0.4f, 0.65f, 0.18f), new Vector2(-460f, 210f), new Vector2(760f, 220f), -22f, 0f);
-        CreateAmbientBand(canvas, "GlowBandB", AccentPink, new Vector2(530f, -180f), new Vector2(680f, 260f), 16f, 1.2f);
-        CreateAmbientBand(canvas, "GlowBandC", new Color(0.95f, 0.48f, 0.12f, 0.14f), new Vector2(620f, 260f), new Vector2(520f, 150f), -8f, 2.4f);
-        CreateAmbientBand(canvas, "GlowBandD", new Color(0.12f, 0.78f, 0.58f, 0.12f), new Vector2(-690f, -250f), new Vector2(420f, 140f), 14f, 1.8f);
-
-        for (int i = 0; i < 12; i++)
-        {
-            float x = -820f + i * 150f;
-            float y = (i % 2 == 0) ? -360f + i * 18f : 320f - i * 14f;
-            GameObject spark = CreatePanel(canvas, $"Spark_{i}", new Color(1f, 1f, 1f, 0.08f), new Vector2(x, y), new Vector2(6f, 6f));
-            var floater = spark.AddComponent<FloatingUiElement>();
-            floater.PositionAmplitude = new Vector2(18f + i, 10f + i * 0.3f);
-            floater.PositionSpeed = 0.22f + i * 0.02f;
-            floater.ScaleAmplitude = 0.18f;
-            floater.RotationAmplitude = 12f;
-            floater.AlphaPulseAmplitude = 0.08f;
-            floater.PhaseOffset = i * 0.45f;
-            floater.CaptureInitialState();
-        }
+        CreateImage(canvas, "TopRule", BorderSubtle, new Vector2(0f, 424f), new Vector2(2400f, 2f));
+        CreateImage(canvas, "BottomRule", BorderSubtle, new Vector2(0f, -424f), new Vector2(2400f, 2f));
     }
 
     void CreateAmbientBand(GameObject parent, string name, Color color, Vector2 position, Vector2 size, float rotation, float phase)
@@ -720,179 +913,271 @@ public class MenuUI : MonoBehaviour
 
     void BuildHeader(GameObject canvas)
     {
-        CreateText(canvas, "Eyebrow", "TACTICAL RELAY // UNITY NETCODE ARENA", 11,
-            AccentBlue, FontStyles.Bold, new Vector2(0f, 386f), new Vector2(720f, 20f));
+        GameObject identity = CreateContainer(canvas, "Identity", new Vector2(-744f, 428f), new Vector2(360f, 74f));
+        GameObject badge = CreatePanel(identity, "Badge", Color.clear, new Vector2(-142f, 0f), new Vector2(58f, 58f));
+        AddBorder(badge, BorderFocus);
+        CreateText(badge, "Number", "07", 22, AccentBlue, FontStyles.Bold, Vector2.zero, new Vector2(54f, 54f));
+        CreateText(identity, "Callsign", "OPERATIVE-07", 20, TextPrimary, FontStyles.Bold,
+            new Vector2(6f, 12f), new Vector2(230f, 28f), TextAlignmentOptions.Left);
+        CreateText(identity, "Rank", "RANK 14 · 1,204 XP", 13, TextSecondary, FontStyles.Normal,
+            new Vector2(18f, -18f), new Vector2(254f, 22f), TextAlignmentOptions.Left);
 
-        TextMeshProUGUI title = CreateText(canvas, "Title", "FIREZONE", 58,
-            TextPrimary, FontStyles.Bold, new Vector2(0f, 330f), new Vector2(760f, 68f));
-        title.characterSpacing = 14f;
-
-        CreateText(canvas, "Subtitle", "Fast squad setup, decisive firefights, and a cleaner trip from menu to match.", 14,
-            TextSecondary, FontStyles.Normal, new Vector2(0f, 288f), new Vector2(760f, 24f));
-
-        CreateImage(canvas, "HeaderLineL", BorderFocus, new Vector2(-188f, 262f), new Vector2(140f, 2f));
-        CreateImage(canvas, "HeaderLineR", BorderFocus, new Vector2(188f, 262f), new Vector2(140f, 2f));
+        CreateText(canvas, "Connection", "▂▄▆  ONLINE · RELAY READY", 13,
+            TextSecondary, FontStyles.Bold, new Vector2(724f, 442f), new Vector2(330f, 28f),
+            TextAlignmentOptions.Right);
     }
 
     void BuildLandingPanel(GameObject parent)
     {
-        CreateTag(parent, "LandingTag", "DROP READY", new Vector2(0f, 112f), AccentOrangeText, AccentOrange);
-        CreateText(parent, "LandingHeadline", "Bring the menu to life, then hit the arena.", 30,
-            TextPrimary, FontStyles.Bold, new Vector2(0f, 46f), new Vector2(580f, 80f));
-        CreateText(parent, "LandingBody", "Start opens the lobby controls, the backdrop breathes, and the handoff into gameplay now has room to feel deliberate.", 14,
-            TextSecondary, FontStyles.Normal, new Vector2(0f, -18f), new Vector2(560f, 54f));
+        TextMeshProUGUI title = CreateText(parent, "LandingHeadline", "VANGUARD\nPROTOCOL", 76,
+            TextPrimary, FontStyles.Bold, new Vector2(-448f, 78f), new Vector2(720f, 210f),
+            TextAlignmentOptions.Left);
+        title.lineSpacing = -12f;
 
-        Button startButton = CreateButton(parent, "PlayButton", "Play / Open Lobby", TextPrimary, AccentBlueDark,
-            new Vector2(0f, -94f), new Vector2(280f, 50f));
-        startButton.onClick.AddListener(OnOpenMainMenu);
+        TextMeshProUGUI tagline = CreateText(parent, "LandingBody", "4-PLAYER TACTICAL DEATHMATCH", 20,
+            AccentBlue, FontStyles.Normal, new Vector2(-448f, -62f), new Vector2(720f, 34f),
+            TextAlignmentOptions.Left);
+        tagline.characterSpacing = 5f;
 
-        CreateText(parent, "LandingHint", "Build your name, create or join a lobby, then launch when the squad is ready.", 11,
-            TextDim, FontStyles.Normal, new Vector2(0f, -146f), new Vector2(520f, 20f));
+        Button singlePlayerButton = CreateButton(parent, "SinglePlayerButton", "SINGLE PLAYER",
+            AccentOrangeText, AccentBlueDark, new Vector2(-684f, -166f), new Vector2(250f, 76f));
+        singlePlayerButton.onClick.AddListener(OnStartSinglePlayer);
+
+        Button multiplayerButton = CreateButton(parent, "MultiplayerButton", "MULTIPLAYER",
+            TextPrimary, Color.clear, new Vector2(-404f, -166f), new Vector2(250f, 76f), BorderFocus);
+        multiplayerButton.onClick.AddListener(OnOpenMainMenu);
+
+        Button settingsButton = CreateButton(parent, "SettingsButton", "SETTINGS", TextPrimary, Color.clear,
+            new Vector2(-139f, -166f), new Vector2(220f, 76f), BorderFocus);
+        settingsButton.onClick.AddListener(OnOpenSettings);
+
+        Button exitButton = CreateButton(parent, "ExitButton", "EXIT", TextSecondary, Color.clear,
+            new Vector2(54f, -166f), new Vector2(110f, 76f));
+        exitButton.onClick.AddListener(OnExitGame);
+
+        CreateText(parent, "Build", "BUILD 0.4.12 · PROTOTYPE ART PASS", 12,
+            TextSecondary, FontStyles.Normal, new Vector2(630f, -286f), new Vector2(380f, 24f),
+            TextAlignmentOptions.Right);
     }
 
     void BuildMainMenu(GameObject parent)
     {
-        CreateTag(parent, "MenuTag", "LOBBY CONTROL", new Vector2(0f, 168f), AccentBlue, new Color(AccentBlue.r, AccentBlue.g, AccentBlue.b, 0.14f));
-        CreateText(parent, "MenuTitle", "Choose your entry route", 24,
-            TextPrimary, FontStyles.Bold, new Vector2(0f, 126f), new Vector2(360f, 32f));
-        CreateText(parent, "MenuSubtitle", "Public for fast matchmaking, private for direct squad invites.", 12,
-            TextSecondary, FontStyles.Normal, new Vector2(0f, 98f), new Vector2(360f, 20f));
+        Button backButton = CreateButton(parent, "BackToLandingButton", "‹  BACK",
+            TextSecondary, Color.clear, new Vector2(-754f, 324f), new Vector2(160f, 44f));
+        backButton.onClick.AddListener(OnReturnToLanding);
 
-        CreateText(parent, "NameLabel", "Your name", 11,
-            TextDim, FontStyles.Normal, new Vector2(-150f, 50f), new Vector2(100f, 16f), TextAlignmentOptions.Left);
+        CreateText(parent, "MenuTag", "MULTIPLAYER", 15, AccentBlue, FontStyles.Normal,
+            new Vector2(-704f, 244f), new Vector2(260f, 24f), TextAlignmentOptions.Left);
+        CreateText(parent, "MenuTitle", "Select Match Type", 42,
+            TextPrimary, FontStyles.Bold, new Vector2(-544f, 190f), new Vector2(580f, 56f),
+            TextAlignmentOptions.Left);
 
-        m_PlayerNameInput = CreateInputField(parent, "NameInput", "Enter your callsign...", new Vector2(0f, 18f), new Vector2(380f, 44f));
+        CreateText(parent, "NameLabel", "CALLSIGN", 11, TextSecondary, FontStyles.Bold,
+            new Vector2(-690f, 116f), new Vector2(180f, 20f), TextAlignmentOptions.Left);
+        m_PlayerNameInput = CreateInputField(parent, "NameInput", "Enter your callsign",
+            new Vector2(-508f, 78f), new Vector2(520f, 52f));
 
-        Button publicButton = CreateButton(parent, "PublicButton", "Create public match",
-            TextPrimary, AccentBlueDark, new Vector2(0f, -52f), new Vector2(380f, 46f));
+        Button publicButton = CreateButton(parent, "PublicButton", "CREATE PUBLIC",
+            TextPrimary, Color.clear, new Vector2(-622f, -4f), new Vector2(390f, 72f), BorderFocus);
         publicButton.onClick.AddListener(OnCreatePublicLobby);
 
-        Button privateButton = CreateButton(parent, "PrivateButton", "Create private match",
-            TextPrimary, BgInput, new Vector2(0f, -106f), new Vector2(380f, 46f), BorderSubtle);
+        Button privateButton = CreateButton(parent, "PrivateButton", "CREATE PRIVATE",
+            TextPrimary, Color.clear, new Vector2(-208f, -4f), new Vector2(390f, 72f), BorderFocus);
         privateButton.onClick.AddListener(OnCreatePrivateLobby);
 
-        CreateOrDivider(parent, "MainDivider", "or join", new Vector2(0f, -154f));
-
-        Button quickJoinButton = CreateButton(parent, "QuickJoinButton", "Quick join",
-            TextPrimary, BgInput, new Vector2(0f, -204f), new Vector2(380f, 46f), BorderSubtle);
-        quickJoinButton.onClick.AddListener(OnQuickJoin);
-
-        Button joinCodeButton = CreateButton(parent, "JoinCodeButton", "Join with code",
-            AccentOrangeText, AccentOrange, new Vector2(0f, -258f), new Vector2(380f, 46f));
+        Button joinCodeButton = CreateButton(parent, "JoinCodeButton", "JOIN CODE",
+            AccentOrangeText, AccentOrange, new Vector2(208f, -4f), new Vector2(390f, 72f));
         joinCodeButton.onClick.AddListener(OnOpenJoinPanel);
 
-        Button backButton = CreateButton(parent, "BackToLandingButton", "Back",
-            TextSecondary, Color.clear, new Vector2(0f, -314f), new Vector2(140f, 36f), BorderSubtle);
-        backButton.onClick.AddListener(OnReturnToLanding);
+        Button quickJoinButton = CreateButton(parent, "QuickJoinButton", "QUICK JOIN",
+            TextPrimary, Color.clear, new Vector2(622f, -4f), new Vector2(390f, 72f), BorderFocus);
+        quickJoinButton.onClick.AddListener(OnQuickJoin);
+
+        GameObject info = CreatePanel(parent, "ModeInfo", Color.clear,
+            new Vector2(0f, -208f), new Vector2(1600f, 270f));
+        AddBorder(info, BorderFocus);
+        CreateText(info, "Title", "CHOOSE HOW YOUR SQUAD CONNECTS", 15, TextSecondary, FontStyles.Bold,
+            new Vector2(0f, 84f), new Vector2(700f, 26f));
+        CreateText(info, "Body",
+            "Public and quick join use matchmaking. Private matches create a six-character code for direct invites.",
+            16, TextPrimary, FontStyles.Normal, new Vector2(0f, 26f), new Vector2(980f, 52f));
+        CreateText(info, "Hint", "Lobby capacity 4 · Host starts the match when every client is ready",
+            13, TextSecondary, FontStyles.Normal, new Vector2(0f, -48f), new Vector2(900f, 24f));
     }
 
     void BuildLobbyPanel(GameObject parent)
     {
-        CreateTag(parent, "LobbyTag", "SQUAD ROOM", new Vector2(0f, 206f), AccentBlue, new Color(AccentBlue.r, AccentBlue.g, AccentBlue.b, 0.14f));
-        m_LobbyTypeText = CreateText(parent, "LobbyType", "Private squad lobby", 14,
-            TextSecondary, FontStyles.Normal, new Vector2(0f, 166f), new Vector2(360f, 22f));
+        m_LobbyTypeText = CreateText(parent, "LobbyType", "PRIVATE LOBBY", 15,
+            AccentBlue, FontStyles.Normal, new Vector2(-704f, 318f), new Vector2(280f, 24f),
+            TextAlignmentOptions.Left);
 
-        m_LobbyCodeSection = CreateContainer(parent, "CodeSection", new Vector2(0f, 112f), new Vector2(390f, 70f));
-        GameObject codeCard = CreatePanel(m_LobbyCodeSection, "CodeCard", BgInput, Vector2.zero, new Vector2(390f, 62f));
-        AddBorder(codeCard, BorderFocus);
-        CreateText(codeCard, "CodeLabel", "Lobby code", 10, TextSecondary, FontStyles.Normal,
-            new Vector2(-110f, 0f), new Vector2(100f, 16f), TextAlignmentOptions.Left);
-        m_LobbyCodeDisplay = CreateText(codeCard, "CodeValue", "------", 22, AccentBlue, FontStyles.Bold,
-            new Vector2(28f, 0f), new Vector2(150f, 30f));
+        m_LobbyCodeSection = CreateContainer(parent, "CodeSection", new Vector2(-532f, 258f), new Vector2(620f, 72f));
+        GameObject codeCard = CreatePanel(m_LobbyCodeSection, "CodeCard", Color.clear, Vector2.zero, new Vector2(620f, 66f));
+        CreateText(codeCard, "CodeLabel", "LOBBY CODE", 10, TextSecondary, FontStyles.Bold,
+            new Vector2(-234f, 18f), new Vector2(130f, 16f), TextAlignmentOptions.Left);
+        m_LobbyCodeDisplay = CreateText(codeCard, "CodeValue", "------", 30, TextPrimary, FontStyles.Bold,
+            new Vector2(-132f, -8f), new Vector2(310f, 42f), TextAlignmentOptions.Left);
         m_LobbyCodeDisplay.characterSpacing = 8f;
 
-        Button copyButton = CreateButton(codeCard, "CopyCodeButton", "Copy",
-            AccentBlue, Color.clear, new Vector2(146f, 0f), new Vector2(74f, 30f), BorderFocus);
+        Button copyButton = CreateButton(codeCard, "CopyCodeButton", "COPY",
+            TextSecondary, Color.clear, new Vector2(176f, -4f), new Vector2(132f, 48f), BorderFocus);
         copyButton.onClick.AddListener(OnCopyCode);
 
-        m_PlayerCountText = CreateText(parent, "PlayerCount", "Players (1/4)", 13,
-            TextSecondary, FontStyles.Normal, new Vector2(-94f, 54f), new Vector2(200f, 20f), TextAlignmentOptions.Left);
+        m_PlayerCountText = CreateText(parent, "PlayerCount", "PLAYERS 1/4", 13,
+            TextSecondary, FontStyles.Bold, new Vector2(690f, 316f), new Vector2(220f, 22f),
+            TextAlignmentOptions.Right);
 
-        GameObject listCard = CreatePanel(parent, "PlayerListCard", BgInput, new Vector2(0f, -34f), new Vector2(390f, 206f));
-        AddBorder(listCard, BorderSubtle);
-
-        float slotY = 72f;
+        GameObject listCard = CreateContainer(parent, "PlayerList", new Vector2(0f, -6f), new Vector2(1600f, 390f));
         for (int i = 0; i < MaxPlayers; i++)
         {
-            CreatePlayerSlot(listCard, i, new Vector2(0f, slotY));
-            slotY -= 46f;
+            float x = i % 2 == 0 ? -410f : 410f;
+            float y = 104f - (i / 2) * 178f;
+            CreatePlayerSlot(listCard, i, new Vector2(x, y));
         }
 
-        m_StartGameButton = CreateButton(parent, "StartButton", "\u25B6  Start game",
-            AccentGreenText, AccentGreen, new Vector2(0f, -154f), new Vector2(390f, 44f));
+        m_StartGameButton = CreateButton(parent, "StartButton", "START MATCH",
+            AccentOrangeText, AccentOrange, new Vector2(544f, -326f), new Vector2(520f, 76f));
         m_StartGameButton.onClick.AddListener(OnStartGame);
 
-        m_ReadyButton = CreateButton(parent, "ReadyButton", "Ready up",
-            TextPrimary, BgInput, new Vector2(0f, -204f), new Vector2(390f, 40f), BorderSubtle);
+        m_ReadyButton = CreateButton(parent, "ReadyButton", "READY UP",
+            AccentGreenText, AccentGreen, new Vector2(-676f, -326f), new Vector2(260f, 76f), AccentGreenText);
         m_ReadyButtonLabel = m_ReadyButton.GetComponentInChildren<TextMeshProUGUI>();
         m_ReadyButton.onClick.AddListener(OnToggleReady);
 
-        Button backButton = CreateButton(parent, "LobbyBackButton", "\u2190  Leave lobby",
-            TextSecondary, BgInput, new Vector2(0f, -254f), new Vector2(390f, 40f), BorderSubtle);
+        Button backButton = CreateButton(parent, "LobbyBackButton", "LEAVE LOBBY",
+            TextSecondary, Color.clear, new Vector2(-430f, -326f), new Vector2(210f, 76f), BorderSubtle);
         backButton.onClick.AddListener(OnBackFromLobby);
     }
 
     void CreatePlayerSlot(GameObject parent, int index, Vector2 position)
     {
-        GameObject slot = CreatePanel(parent, $"Slot_{index}", EmptySlot, position, new Vector2(350f, 40f));
+        GameObject slot = CreatePanel(parent, $"Slot_{index}", EmptySlot, position, new Vector2(780f, 136f));
+        AddBorder(slot, index == 0 ? AccentBlue : BorderFocus);
         m_PlayerSlots.Add(slot);
 
         Image slotBg = slot.GetComponent<Image>();
         m_PlayerSlotBgs.Add(slotBg);
 
-        GameObject icon = CreatePanel(slot, "Icon", AccentBlueDark, new Vector2(-150f, 0f), new Vector2(24f, 24f));
+        GameObject icon = CreatePanel(slot, "Icon", BgInput, new Vector2(-330f, 0f), new Vector2(76f, 76f));
+        AddBorder(icon, index == 0 ? AccentBlue : BorderFocus);
         m_PlayerSlotIcons.Add(icon);
-        CreateText(icon, "Initial", (index + 1).ToString(), 11, AccentBlue, FontStyles.Bold, Vector2.zero, new Vector2(24f, 24f));
+        CreateText(icon, "Initial", (index + 1).ToString("00"), 20, AccentBlue, FontStyles.Bold,
+            Vector2.zero, new Vector2(70f, 70f));
         icon.SetActive(false);
 
-        TextMeshProUGUI nameText = CreateText(slot, "Name", string.Empty, 14, TextPrimary, FontStyles.Normal,
-            new Vector2(12f, 0f), new Vector2(280f, 34f), TextAlignmentOptions.Left);
+        TextMeshProUGUI nameText = CreateText(slot, "Name", string.Empty, 20, TextPrimary, FontStyles.Bold,
+            new Vector2(22f, 0f), new Vector2(580f, 68f), TextAlignmentOptions.Left);
         nameText.gameObject.SetActive(false);
         m_PlayerSlotNames.Add(nameText);
 
-        GameObject emptyDots = CreateContainer(slot, "EmptyDots", Vector2.zero, new Vector2(350f, 40f));
-        for (int i = 0; i < 4; i++)
-        {
-            CreatePanel(emptyDots, $"Dot_{i}", new Color(1f, 1f, 1f, 0.06f), new Vector2(-28f + i * 18f, 0f), new Vector2(4f, 4f));
-        }
-
-        CreateText(emptyDots, "WaitingText", "Waiting for player...", 11, TextDim, FontStyles.Normal,
-            new Vector2(34f, 0f), new Vector2(220f, 34f), TextAlignmentOptions.Left);
+        GameObject emptyDots = CreateContainer(slot, "EmptySlot", Vector2.zero, new Vector2(760f, 120f));
+        CreateText(emptyDots, "WaitingText", "⊕  WAITING FOR PLAYER", 16, TextSecondary, FontStyles.Bold,
+            Vector2.zero, new Vector2(460f, 50f));
 
         m_PlayerSlotEmptyDots.Add(emptyDots);
     }
 
     void BuildJoinPanel(GameObject parent)
     {
-        CreateTag(parent, "JoinTag", "DIRECT CONNECT", new Vector2(0f, 110f), AccentOrangeText, new Color(AccentOrange.r, AccentOrange.g, AccentOrange.b, 0.2f));
-        CreateText(parent, "JoinTitle", "Enter lobby code", 24,
-            TextPrimary, FontStyles.Bold, new Vector2(0f, 66f), new Vector2(340f, 30f));
-        CreateText(parent, "JoinSubtitle", "Private squads can hand you a six-character code.", 12,
-            TextSecondary, FontStyles.Normal, new Vector2(0f, 38f), new Vector2(340f, 18f));
+        Button backButton = CreateButton(parent, "JoinBackButton", "‹  BACK",
+            TextSecondary, Color.clear, new Vector2(-754f, 324f), new Vector2(160f, 44f));
+        backButton.onClick.AddListener(() => ShowScreen(MenuScreenState.ModeSelect));
 
-        m_LobbyCodeInput = CreateInputField(parent, "CodeInput", "_ _ _ _ _ _", new Vector2(0f, -24f), new Vector2(380f, 50f));
+        CreateText(parent, "JoinTag", "MULTIPLAYER", 15, AccentBlue, FontStyles.Normal,
+            new Vector2(-704f, 244f), new Vector2(260f, 24f), TextAlignmentOptions.Left);
+        CreateText(parent, "JoinTitle", "Join Private Lobby", 42,
+            TextPrimary, FontStyles.Bold, new Vector2(-528f, 190f), new Vector2(620f, 56f),
+            TextAlignmentOptions.Left);
+
+        GameObject codePanel = CreatePanel(parent, "CodePanel", Color.clear,
+            new Vector2(0f, -88f), new Vector2(1600f, 500f));
+        AddBorder(codePanel, BorderFocus);
+        CreateText(codePanel, "Instruction", "ENTER 6-CHARACTER LOBBY CODE", 15,
+            TextSecondary, FontStyles.Bold, new Vector2(0f, 156f), new Vector2(620f, 28f));
+
+        m_LobbyCodeInput = CreateInputField(codePanel, "CodeInput", "_ _ _ _ _ _",
+            new Vector2(0f, 70f), new Vector2(660f, 92f));
         m_LobbyCodeInput.characterLimit = 6;
         m_LobbyCodeInput.contentType = TMP_InputField.ContentType.Alphanumeric;
         m_LobbyCodeInput.onValueChanged.AddListener(OnLobbyCodeChanged);
         m_LobbyCodeInput.textComponent.alignment = TextAlignmentOptions.Center;
-        m_LobbyCodeInput.textComponent.characterSpacing = 10f;
-        m_LobbyCodeInput.textComponent.fontSize = 22f;
+        m_LobbyCodeInput.textComponent.characterSpacing = 18f;
+        m_LobbyCodeInput.textComponent.fontSize = 34f;
 
         var placeholder = m_LobbyCodeInput.placeholder as TextMeshProUGUI;
         if (placeholder != null)
         {
             placeholder.alignment = TextAlignmentOptions.Center;
-            placeholder.characterSpacing = 10f;
-            placeholder.fontSize = 22f;
+            placeholder.characterSpacing = 18f;
+            placeholder.fontSize = 34f;
         }
 
-        Button joinButton = CreateButton(parent, "JoinButton", "Join lobby",
-            AccentOrangeText, AccentOrange, new Vector2(0f, -98f), new Vector2(380f, 48f));
+        Button joinButton = CreateButton(codePanel, "JoinButton", "JOIN LOBBY",
+            AccentOrangeText, AccentOrange, new Vector2(0f, -48f), new Vector2(340f, 72f));
         joinButton.onClick.AddListener(OnJoinByCode);
 
-        Button backButton = CreateButton(parent, "JoinBackButton", "Back",
-            TextSecondary, BgInput, new Vector2(0f, -154f), new Vector2(380f, 40f), BorderSubtle);
-        backButton.onClick.AddListener(() => ShowScreen(MenuScreenState.ModeSelect));
+        CreateText(codePanel, "QuickJoinHint", "NO CODE? RETURN AND USE QUICK JOIN FOR AN OPEN PUBLIC LOBBY",
+            12, TextSecondary, FontStyles.Normal, new Vector2(0f, -150f), new Vector2(760f, 24f));
+    }
+
+    void BuildSettingsPanel(GameObject parent)
+    {
+        CreateText(parent, "SettingsEyebrow", "SYSTEM", 15, AccentBlue, FontStyles.Normal,
+            new Vector2(-510f, 302f), new Vector2(220f, 24f), TextAlignmentOptions.Left);
+        CreateText(parent, "SettingsTitle", "Settings", 42, TextPrimary, FontStyles.Bold,
+            new Vector2(-430f, 252f), new Vector2(380f, 56f), TextAlignmentOptions.Left);
+
+        GameObject board = CreatePanel(parent, "SettingsBoard", Color.clear,
+            new Vector2(0f, -18f), new Vector2(1180f, 500f));
+        AddBorder(board, BorderFocus);
+
+        CreateText(board, "GameplayTab", "GAMEPLAY", 15, AccentOrangeText, FontStyles.Bold,
+            new Vector2(-392f, 202f), new Vector2(392f, 70f));
+        CreatePanel(board, "GameplayTabBg", AccentOrange, new Vector2(-392f, 202f), new Vector2(392f, 70f))
+            .transform.SetAsFirstSibling();
+        CreateText(board, "AudioTab", "AUDIO", 15, TextSecondary, FontStyles.Bold,
+            new Vector2(0f, 202f), new Vector2(392f, 70f));
+        CreateText(board, "VideoTab", "VIDEO", 15, TextSecondary, FontStyles.Bold,
+            new Vector2(392f, 202f), new Vector2(392f, 70f));
+        CreateImage(board, "TabRule", BorderFocus, new Vector2(0f, 166f), new Vector2(1180f, 2f));
+
+        CreateMenuSettingsStepper(board, "Sensitivity", "Mouse Sensitivity", new Vector2(0f, 92f),
+            out m_MenuSensitivityValue,
+            () => AdjustMenuSensitivity(-0.1f), () => AdjustMenuSensitivity(0.1f));
+        CreateMenuSettingsStepper(board, "Volume", "Master Volume", new Vector2(0f, 10f),
+            out m_MenuVolumeValue,
+            () => AdjustMenuVolume(-0.1f), () => AdjustMenuVolume(0.1f));
+
+        Button fullscreen = CreateButton(board, "Fullscreen", "TOGGLE FULLSCREEN",
+            TextPrimary, Color.clear, new Vector2(0f, -78f), new Vector2(1080f, 58f), BorderFocus);
+        fullscreen.onClick.AddListener(ToggleMenuFullscreen);
+
+        Button back = CreateButton(board, "SettingsBack", "BACK",
+            AccentOrangeText, AccentOrange, new Vector2(416f, -184f), new Vector2(248f, 64f));
+        back.onClick.AddListener(() => ShowScreen(MenuScreenState.Landing));
+        RefreshMenuSettings();
+    }
+
+    void CreateMenuSettingsStepper(
+        GameObject parent,
+        string name,
+        string label,
+        Vector2 position,
+        out TextMeshProUGUI valueText,
+        UnityEngine.Events.UnityAction onMinus,
+        UnityEngine.Events.UnityAction onPlus)
+    {
+        GameObject row = CreateContainer(parent, name, position, new Vector2(1080f, 64f));
+        CreateText(row, "Label", label, 16, TextPrimary, FontStyles.Normal,
+            new Vector2(-390f, 0f), new Vector2(300f, 36f), TextAlignmentOptions.Left);
+        Button minus = CreateButton(row, "Minus", "−", TextPrimary, Color.clear,
+            new Vector2(300f, 0f), new Vector2(54f, 44f), BorderFocus);
+        minus.onClick.AddListener(onMinus);
+        valueText = CreateText(row, "Value", "1.0", 17, AccentBlue, FontStyles.Bold,
+            new Vector2(380f, 0f), new Vector2(90f, 40f));
+        Button plus = CreateButton(row, "Plus", "+", TextPrimary, Color.clear,
+            new Vector2(460f, 0f), new Vector2(54f, 44f), BorderFocus);
+        plus.onClick.AddListener(onPlus);
     }
 
     void OnLobbyCodeChanged(string value)
@@ -909,36 +1194,35 @@ public class MenuUI : MonoBehaviour
         GameObject overlay = CreatePanel(canvas, "LoadingOverlay", new Color(0.03f, 0.04f, 0.07f, 0.97f),
             Vector2.zero, new Vector2(1920f, 1080f));
         CanvasGroup group = overlay.AddComponent<CanvasGroup>();
+        VanguardUITheme.AddCornerFrame(overlay);
 
-        GameObject frame = CreatePanel(overlay, "LoadingFrame", new Color(0.08f, 0.1f, 0.15f, 0.92f),
-            new Vector2(0f, 20f), new Vector2(560f, 260f));
-        AddBorder(frame, BorderFocus);
+        GameObject frame = CreateContainer(overlay, "LoadingFrame", new Vector2(0f, 20f), new Vector2(940f, 360f));
 
-        TextMeshProUGUI title = CreateText(frame, "LoadingTitle", "Opening Drop Corridor", 28,
-            TextPrimary, FontStyles.Bold, new Vector2(0f, 76f), new Vector2(440f, 34f));
-        TextMeshProUGUI message = CreateText(frame, "LoadingMessage", "Preparing the arena...", 13,
-            TextSecondary, FontStyles.Normal, new Vector2(0f, 38f), new Vector2(440f, 20f));
+        TextMeshProUGUI title = CreateText(frame, "LoadingTitle", "DEPLOYING TO ARENA", 38,
+            TextPrimary, FontStyles.Bold, new Vector2(0f, 112f), new Vector2(760f, 54f));
+        TextMeshProUGUI message = CreateText(frame, "LoadingMessage", "Synchronizing squad state", 15,
+            TextSecondary, FontStyles.Normal, new Vector2(0f, 58f), new Vector2(720f, 26f));
 
-        GameObject spinner = CreatePanel(frame, "Spinner", Color.clear, new Vector2(-216f, 68f), new Vector2(42f, 42f));
-        CreateImage(spinner, "SpinnerRingA", AccentBlue, Vector2.zero, new Vector2(42f, 4f));
-        CreateImage(spinner, "SpinnerRingB", new Color(AccentBlue.r, AccentBlue.g, AccentBlue.b, 0.35f), new Vector2(0f, 14f), new Vector2(30f, 3f));
+        GameObject spinner = CreateContainer(frame, "Spinner", new Vector2(0f, -6f), new Vector2(72f, 72f));
+        CreateImage(spinner, "SpinnerRingA", AccentBlue, new Vector2(0f, 26f), new Vector2(72f, 4f));
+        CreateImage(spinner, "SpinnerRingB", TextDim, new Vector2(0f, -26f), new Vector2(50f, 3f));
 
-        GameObject track = CreatePanel(frame, "ProgressTrack", BgInput, new Vector2(0f, -12f), new Vector2(440f, 12f));
+        GameObject track = CreatePanel(frame, "ProgressTrack", BgInput, new Vector2(0f, -88f), new Vector2(720f, 8f));
         AddBorder(track, BorderSubtle);
 
-        GameObject fill = CreatePanel(track, "ProgressFill", AccentBlue, new Vector2(-220f, 0f), new Vector2(440f, 12f));
+        GameObject fill = CreatePanel(track, "ProgressFill", AccentBlue, new Vector2(-360f, 0f), new Vector2(720f, 8f));
         RectTransform fillRect = fill.GetComponent<RectTransform>();
         fillRect.pivot = new Vector2(0f, 0.5f);
         fillRect.anchorMin = new Vector2(0f, 0.5f);
         fillRect.anchorMax = new Vector2(0f, 0.5f);
-        fillRect.anchoredPosition = new Vector2(-220f, 0f);
+        fillRect.anchoredPosition = new Vector2(-360f, 0f);
         fillRect.localScale = new Vector3(0.001f, 1f, 1f);
 
         TextMeshProUGUI progressText = CreateText(frame, "ProgressText", "0%", 12,
-            TextSecondary, FontStyles.Bold, new Vector2(204f, -34f), new Vector2(60f, 18f), TextAlignmentOptions.Right);
+            TextSecondary, FontStyles.Bold, new Vector2(330f, -114f), new Vector2(80f, 20f), TextAlignmentOptions.Right);
 
-        CreateText(frame, "LoadingFooter", "Session handoff and scene sync are intentionally staged here.", 11,
-            TextDim, FontStyles.Normal, new Vector2(0f, -82f), new Vector2(420f, 18f));
+        CreateText(frame, "LoadingFooter", "TIP · MOVE WITH YOUR SQUAD AND CONTROL THE PICKUP LANES", 11,
+            TextDim, FontStyles.Normal, new Vector2(0f, -146f), new Vector2(720f, 20f));
 
         m_LoadingOverlay = overlay.AddComponent<MenuLoadingOverlay>();
         m_LoadingOverlay.Bind(group, spinner.GetComponent<RectTransform>(), fillRect, title, message, progressText);
@@ -946,10 +1230,9 @@ public class MenuUI : MonoBehaviour
 
     void BuildStatusBar(GameObject canvas)
     {
-        GameObject statusBar = CreatePanel(canvas, "StatusBar", BgSurface, new Vector2(0f, -472f), new Vector2(420f, 34f));
-        AddBorder(statusBar, BorderSubtle);
+        GameObject statusBar = CreateContainer(canvas, "StatusBar", new Vector2(0f, -470f), new Vector2(720f, 34f));
 
-        GameObject dot = CreatePanel(statusBar, "StatusDot", AccentBlue, new Vector2(-182f, 0f), new Vector2(6f, 6f));
+        GameObject dot = CreatePanel(statusBar, "StatusDot", AccentBlue, new Vector2(-292f, 0f), new Vector2(6f, 6f));
         var dotFloat = dot.AddComponent<FloatingUiElement>();
         dotFloat.PositionAmplitude = new Vector2(0f, 0f);
         dotFloat.ScaleAmplitude = 0.22f;
@@ -958,15 +1241,12 @@ public class MenuUI : MonoBehaviour
         dotFloat.CaptureInitialState();
 
         m_StatusText = CreateText(statusBar, "StatusText", "Initializing services...", 11,
-            TextSecondary, FontStyles.Normal, new Vector2(8f, 0f), new Vector2(320f, 26f), TextAlignmentOptions.Left);
-        CreateText(canvas, "Version", "v0.2.0", 10, TextDim, FontStyles.Normal,
-            new Vector2(-872f, -510f), new Vector2(100f, 20f), TextAlignmentOptions.Left);
+            TextSecondary, FontStyles.Normal, new Vector2(22f, 0f), new Vector2(570f, 26f), TextAlignmentOptions.Left);
     }
 
     AnimatedMenuPanel CreateAnimatedCard(GameObject parent, string name, Vector2 position, Vector2 size)
     {
-        GameObject card = CreatePanel(parent, name, BgSurface, position, size);
-        AddBorder(card, BorderSubtle);
+        GameObject card = CreatePanel(parent, name, Color.clear, position, size);
         card.AddComponent<CanvasGroup>();
         AnimatedMenuPanel animatedPanel = card.AddComponent<AnimatedMenuPanel>();
         animatedPanel.HiddenOffset = new Vector2(0f, 30f);
@@ -1045,7 +1325,7 @@ public class MenuUI : MonoBehaviour
         textComponent.color = color;
         textComponent.fontStyle = style;
         textComponent.alignment = alignment;
-        textComponent.enableWordWrapping = true;
+        textComponent.textWrappingMode = TextWrappingModes.Normal;
 
         if (textComponent.font == null)
         {
@@ -1090,7 +1370,7 @@ public class MenuUI : MonoBehaviour
         obj.AddComponent<MenuButtonAnimator>();
 
         TextMeshProUGUI labelText = CreateText(obj, "Label", label, 13, textColor, FontStyles.Bold, Vector2.zero, size);
-        labelText.enableWordWrapping = false;
+        labelText.textWrappingMode = TextWrappingModes.NoWrap;
         return button;
     }
 
@@ -1128,7 +1408,7 @@ public class MenuUI : MonoBehaviour
         inputText.fontSize = 15f;
         inputText.color = TextPrimary;
         inputText.alignment = TextAlignmentOptions.MidlineLeft;
-        inputText.enableWordWrapping = false;
+        inputText.textWrappingMode = TextWrappingModes.NoWrap;
         if (inputText.font == null)
         {
             inputText.font = TMP_Settings.defaultFontAsset;
@@ -1147,7 +1427,7 @@ public class MenuUI : MonoBehaviour
         placeholderText.fontSize = 15f;
         placeholderText.color = TextDim;
         placeholderText.alignment = TextAlignmentOptions.MidlineLeft;
-        placeholderText.enableWordWrapping = false;
+        placeholderText.textWrappingMode = TextWrappingModes.NoWrap;
         if (placeholderText.font == null)
         {
             placeholderText.font = TMP_Settings.defaultFontAsset;
@@ -1175,8 +1455,27 @@ public class MenuUI : MonoBehaviour
         outline.effectDistance = new Vector2(1f, 1f);
     }
 
+    internal void ToolkitOpenMainMenu() => OnOpenMainMenu();
+    internal void ToolkitStartSinglePlayer() => OnStartSinglePlayer();
+    internal void ToolkitOpenSettings() => OnOpenSettings();
+    internal void ToolkitExitGame() => OnExitGame();
+    internal void ToolkitReturnToLanding() => OnReturnToLanding();
+    internal void ToolkitCreatePublicLobby() => OnCreatePublicLobby();
+    internal void ToolkitCreatePrivateLobby() => OnCreatePrivateLobby();
+    internal void ToolkitOpenJoinPanel() => OnOpenJoinPanel();
+    internal void ToolkitQuickJoin() => OnQuickJoin();
+    internal void ToolkitJoinByCode() => OnJoinByCode();
+    internal void ToolkitCopyCode() => OnCopyCode();
+    internal void ToolkitToggleReady() => OnToggleReady();
+    internal void ToolkitLeaveLobby() => OnBackFromLobby();
+    internal void ToolkitStartGame() => OnStartGame();
+    internal void ToolkitAdjustSensitivity(float delta) => AdjustMenuSensitivity(delta);
+    internal void ToolkitAdjustVolume(float delta) => AdjustMenuVolume(delta);
+    internal void ToolkitToggleFullscreen() => ToggleMenuFullscreen();
+
     void OnDestroy()
     {
+        m_IsDestroyed = true;
         UnsubscribeNetworkCallbacks();
         UnityEngine.SceneManagement.SceneManager.sceneLoaded -= OnUnitySceneLoaded;
 

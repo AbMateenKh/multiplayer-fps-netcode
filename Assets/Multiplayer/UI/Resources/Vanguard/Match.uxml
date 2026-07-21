@@ -1,0 +1,263 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <Style src="Theme.uss" />
+    <Style src="Match.uss" />
+    <ui:VisualElement name="match-root" class="app app--transparent match-app">
+        <ui:VisualElement name="damage-vignette" class="damage-vignette hidden">
+            <ui:VisualElement class="damage-edge damage-edge--top" />
+            <ui:VisualElement class="damage-edge damage-edge--bottom" />
+            <ui:VisualElement class="damage-edge damage-edge--left" />
+            <ui:VisualElement class="damage-edge damage-edge--right" />
+        </ui:VisualElement>
+
+        <ui:VisualElement name="hud-layer" class="hud-layer">
+            <ui:VisualElement name="hud-scanline" class="hud-scanline" />
+            <ui:VisualElement class="combat-stats hud-module">
+                <ui:VisualElement class="module-accent module-accent--top" />
+                <ui:VisualElement class="module-heading">
+                    <ui:Label text="MATCH PERFORMANCE" class="module-kicker" />
+                    <ui:Label text="LIVE" class="module-live" />
+                </ui:VisualElement>
+                <ui:VisualElement class="combat-stats__row">
+                    <ui:VisualElement class="combat-stat">
+                        <ui:Label text="KILLS" class="combat-stat__label" />
+                        <ui:Label name="hud-kills" text="0" class="combat-stat__value" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="combat-stats__divider" />
+                    <ui:VisualElement class="combat-stat">
+                        <ui:Label text="DEATHS" class="combat-stat__label" />
+                        <ui:Label name="hud-deaths" text="0" class="combat-stat__value combat-stat__value--muted" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="combat-ratio">
+                        <ui:Label text="K/D" class="combat-ratio__label" />
+                        <ui:Label name="hud-ratio" text="0.00" class="combat-ratio__value" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+                <ui:VisualElement class="score-progress">
+                    <ui:VisualElement class="score-progress__meta">
+                        <ui:Label text="SCORE LIMIT" class="score-progress__label" />
+                        <ui:Label name="score-progress-label" text="0 / 30" class="score-progress__label score-progress__label--value" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="score-progress__track">
+                        <ui:VisualElement name="score-progress-fill" class="score-progress__fill" />
+                        <ui:VisualElement class="score-progress__tick score-progress__tick--1" />
+                        <ui:VisualElement class="score-progress__tick score-progress__tick--2" />
+                        <ui:VisualElement class="score-progress__tick score-progress__tick--3" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+            <ui:VisualElement class="match-clock hud-module">
+                <ui:VisualElement class="clock-wing clock-wing--left" />
+                <ui:VisualElement class="clock-wing clock-wing--right" />
+                <ui:VisualElement class="match-clock__header">
+                    <ui:Label text="ROUND 01" class="module-kicker" />
+                    <ui:VisualElement class="clock-status-dot" />
+                    <ui:Label text="ACTIVE" class="match-clock__active" />
+                </ui:VisualElement>
+                <ui:Label name="hud-timer" text="03:00" class="match-clock__time" />
+                <ui:Label name="match-mode" text="DEATHMATCH &#183; FIRST TO 30" class="match-clock__mode" />
+            </ui:VisualElement>
+
+            <ui:VisualElement class="health hud-module">
+                <ui:VisualElement class="module-accent module-accent--left" />
+                <ui:VisualElement class="health__main">
+                    <ui:VisualElement class="health__header">
+                        <ui:Label text="VITAL SIGNS" class="module-kicker" />
+                        <ui:Label name="health-status" text="COMBAT READY" class="health__status" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="health__readout">
+                        <ui:VisualElement class="health__glyph">
+                            <ui:VisualElement class="health__pulse-line" />
+                        </ui:VisualElement>
+                        <ui:Label name="health-value" text="100" class="health__value" />
+                        <ui:Label text="HP" class="health__unit" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="health__track">
+                        <ui:VisualElement name="health-fill" class="health__fill" />
+                        <ui:VisualElement class="health__segment health__segment--1" />
+                        <ui:VisualElement class="health__segment health__segment--2" />
+                        <ui:VisualElement class="health__segment health__segment--3" />
+                        <ui:VisualElement class="health__segment health__segment--4" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="health__telemetry">
+                        <ui:Label text="BIO-LINK" class="health__telemetry-label" />
+                        <ui:VisualElement class="health__telemetry-bars">
+                            <ui:VisualElement class="telemetry-bar telemetry-bar--1" />
+                            <ui:VisualElement class="telemetry-bar telemetry-bar--2" />
+                            <ui:VisualElement class="telemetry-bar telemetry-bar--3" />
+                            <ui:VisualElement class="telemetry-bar telemetry-bar--4" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+            <ui:VisualElement class="ammo hud-module">
+                <ui:VisualElement class="module-accent module-accent--right" />
+                <ui:VisualElement class="ammo__header">
+                    <ui:Label text="PRIMARY" class="module-kicker" />
+                    <ui:Label text="AUTO" class="ammo__mode" />
+                </ui:VisualElement>
+                <ui:Label name="weapon-name" text="ASSAULT RIFLE" class="ammo__weapon" />
+                <ui:VisualElement class="ammo__readout">
+                    <ui:Label name="ammo-current" text="24" class="ammo__current" />
+                    <ui:VisualElement class="ammo__divider" />
+                    <ui:VisualElement class="ammo__reserve-block">
+                        <ui:Label text="CAPACITY" class="ammo__reserve-label" />
+                        <ui:Label name="ammo-reserve" text="90" class="ammo__reserve" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+                <ui:VisualElement class="ammo__magazine">
+                    <ui:VisualElement class="ammo-pip ammo-pip--1" />
+                    <ui:VisualElement class="ammo-pip ammo-pip--2" />
+                    <ui:VisualElement class="ammo-pip ammo-pip--3" />
+                    <ui:VisualElement class="ammo-pip ammo-pip--4" />
+                    <ui:VisualElement class="ammo-pip ammo-pip--5" />
+                    <ui:VisualElement class="ammo-pip ammo-pip--6" />
+                    <ui:VisualElement class="ammo-pip ammo-pip--7" />
+                    <ui:VisualElement class="ammo-pip ammo-pip--8" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+            <ui:VisualElement name="kill-feed" class="kill-feed" />
+            <ui:VisualElement name="crosshair" class="crosshair">
+                <ui:VisualElement class="crosshair__ring" />
+                <ui:VisualElement class="crosshair__arm crosshair__arm--top" />
+                <ui:VisualElement class="crosshair__arm crosshair__arm--right" />
+                <ui:VisualElement class="crosshair__arm crosshair__arm--bottom" />
+                <ui:VisualElement class="crosshair__arm crosshair__arm--left" />
+                <ui:VisualElement class="crosshair__dot" />
+            </ui:VisualElement>
+            <ui:Label name="hit-marker" text="&#215;" class="hit-marker hidden" />
+            <ui:Label name="kill-confirm" text="ELIMINATED" class="kill-confirm hidden" />
+            <ui:Label name="protection-label" text="PROTECTED" class="protection hidden" />
+            <ui:VisualElement name="pickup-prompt" class="pickup-prompt hidden">
+                <ui:Label text="E" class="pickup-prompt__key" />
+                <ui:Label name="pickup-prompt-label" text="Pick up weapon" class="pickup-prompt__label" />
+            </ui:VisualElement>
+            <ui:Label name="pickup-feedback" text="ITEM ACQUIRED" class="pickup-feedback hidden" />
+            <ui:Label name="low-health" text="CRITICAL · FIND COVER" class="low-health hidden" />
+            <ui:VisualElement class="combat-link">
+                <ui:VisualElement class="combat-link__dot" />
+                <ui:Label text="COMBAT LINK" class="combat-link__label" />
+                <ui:VisualElement class="combat-link__rule" />
+                <ui:Label text="SYNCED" class="combat-link__state" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement name="countdown-overlay" class="match-overlay countdown-overlay hidden">
+            <ui:Label name="countdown-label" text="GET READY" class="countdown__label" />
+            <ui:Label name="countdown-value" text="3" class="countdown__value" />
+        </ui:VisualElement>
+
+        <ui:VisualElement name="death-overlay" class="match-overlay death-overlay hidden">
+            <ui:VisualElement class="corner corner--tl" /><ui:VisualElement class="corner corner--tr" />
+            <ui:VisualElement class="corner corner--bl" /><ui:VisualElement class="corner corner--br" />
+            <ui:VisualElement class="death-content">
+                <ui:Label text="COMBAT STATUS" class="eyebrow death__eyebrow" />
+                <ui:Label name="death-title" text="ELIMINATED BY PLAYER" class="death__title" />
+                <ui:Label name="death-subtitle" text="Re-entering the combat zone" class="copy death__subtitle" />
+                <ui:VisualElement class="respawn-ring">
+                    <ui:Label name="death-timer" text="3.0" class="respawn-ring__value" />
+                </ui:VisualElement>
+                <ui:Label text="RESPAWNING" class="micro death__respawning" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement name="scoreboard-overlay" class="match-overlay scoreboard-overlay hidden">
+            <ui:VisualElement class="corner corner--tl" /><ui:VisualElement class="corner corner--tr" />
+            <ui:VisualElement class="corner corner--bl" /><ui:VisualElement class="corner corner--br" />
+            <ui:VisualElement class="scoreboard">
+                <ui:Label name="scoreboard-timer" text="DEATHMATCH · 03:00 REMAINING" class="scoreboard__title" />
+                <ui:VisualElement class="score-header">
+                    <ui:Label text="#" class="score-col score-col--rank" />
+                    <ui:Label text="PLAYER" class="score-col score-col--player" />
+                    <ui:Label text="K" class="score-col score-col--stat" />
+                    <ui:Label text="D" class="score-col score-col--stat" />
+                    <ui:Label text="K/D" class="score-col score-col--kd" />
+                </ui:VisualElement>
+                <ui:VisualElement name="scoreboard-rows" class="score-rows" />
+                <ui:Label text="HOLD TAB TO VIEW · RELEASE TO RETURN TO MATCH" class="scoreboard__footer" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement name="results-overlay" class="match-overlay results-overlay hidden">
+            <ui:VisualElement class="corner corner--tl" /><ui:VisualElement class="corner corner--tr" />
+            <ui:VisualElement class="corner corner--bl" /><ui:VisualElement class="corner corner--br" />
+            <ui:VisualElement class="results panel">
+                <ui:Label text="MATCH COMPLETE" class="eyebrow results__eyebrow" />
+                <ui:Label name="results-title" text="PLAYER WINS" class="results__title" />
+                <ui:Label name="results-subtitle" text="SCORE LIMIT REACHED" class="results__reason" />
+                <ui:VisualElement class="rule" />
+                <ui:VisualElement class="results-summary">
+                    <ui:Label name="results-record" text="YOUR RECORD · 0 KILLS · 0 DEATHS" class="copy" />
+                    <ui:Label name="results-placement" text="PLACEMENT · 1ST OF 4" class="copy" />
+                </ui:VisualElement>
+                <ui:VisualElement class="score-header results-score-header">
+                    <ui:Label text="#" class="score-col score-col--rank" />
+                    <ui:Label text="PLAYER" class="score-col score-col--player" />
+                    <ui:Label text="K" class="score-col score-col--stat" />
+                    <ui:Label text="D" class="score-col score-col--stat" />
+                    <ui:Label text="K/D" class="score-col score-col--kd" />
+                </ui:VisualElement>
+                <ui:VisualElement name="results-rows" class="score-rows results-rows" />
+                <ui:VisualElement class="results-actions">
+                    <ui:Button name="return-menu-button" text="RETURN TO MENU" class="button" />
+                    <ui:Button name="next-round-button" text="START NEXT ROUND" class="button button--primary" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement name="pause-overlay" class="match-overlay pause-overlay hidden">
+            <ui:VisualElement class="corner corner--tl" /><ui:VisualElement class="corner corner--tr" />
+            <ui:VisualElement class="corner corner--bl" /><ui:VisualElement class="corner corner--br" />
+            <ui:VisualElement class="pause panel">
+                <ui:VisualElement class="pause-heading">
+                    <ui:Label text="MATCH PAUSED" class="eyebrow" />
+                    <ui:Label text="Settings" class="title" />
+                </ui:VisualElement>
+                <ui:VisualElement class="settings-tabs">
+                    <ui:Label text="GAMEPLAY" class="settings-tab settings-tab--active" />
+                    <ui:Label text="AUDIO" class="settings-tab" />
+                    <ui:Label text="VIDEO" class="settings-tab" />
+                </ui:VisualElement>
+                <ui:VisualElement class="pause-body">
+                    <ui:VisualElement class="setting-row">
+                        <ui:Label text="Mouse Sensitivity" class="setting-row__label" />
+                        <ui:VisualElement class="stepper">
+                            <ui:Button name="pause-sensitivity-minus" text="−" class="stepper__button" />
+                            <ui:Label name="pause-sensitivity-value" text="1.0" class="value stepper__value" />
+                            <ui:Button name="pause-sensitivity-plus" text="+" class="stepper__button" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                    <ui:VisualElement class="setting-row">
+                        <ui:Label text="Master Volume" class="setting-row__label" />
+                        <ui:VisualElement class="stepper">
+                            <ui:Button name="pause-volume-minus" text="−" class="stepper__button" />
+                            <ui:Label name="pause-volume-value" text="100%" class="value stepper__value" />
+                            <ui:Button name="pause-volume-plus" text="+" class="stepper__button" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                    <ui:Button name="pause-fullscreen-button" text="TOGGLE FULLSCREEN" class="setting-row setting-row--button" />
+                </ui:VisualElement>
+                <ui:VisualElement class="pause-actions">
+                    <ui:Button name="leave-match-button" text="LEAVE MATCH" class="button button--danger" />
+                    <ui:Button name="resume-button" text="RESUME" class="button button--primary" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement name="help-overlay" class="match-overlay help-overlay hidden">
+            <ui:VisualElement class="help panel">
+                <ui:Label text="TACTICAL BRIEF" class="eyebrow" />
+                <ui:Label text="Deathmatch Rules" class="title" />
+                <ui:Label text="Most kills when the timer ends wins. Fewer deaths breaks tied scores. Reaching the score limit ends the round immediately." class="copy help__copy" />
+                <ui:VisualElement class="rule" />
+                <ui:VisualElement class="help-columns">
+                    <ui:Label text="WASD       MOVE&#10;MOUSE      AIM&#10;LEFT CLICK FIRE&#10;R          RELOAD&#10;1-3/SCROLL SWITCH WEAPON" class="help__controls" />
+                    <ui:Label text="E          PICK UP&#10;TAB        SCOREBOARD&#10;F1 / H     RULES&#10;ESC        PAUSE&#10;RESPAWN    3 SECONDS" class="help__controls" />
+                </ui:VisualElement>
+                <ui:Label text="PRESS F1 OR H TO CLOSE" class="micro help__footer" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

@@ -11,7 +11,12 @@ public class RelayManager : MonoBehaviour
     public static RelayManager Instance { get; private set; }
     public string LastErrorMessage { get; private set; }
 
-   
+#if UNITY_WEBGL && !UNITY_EDITOR
+    const string k_RelayConnectionType = "wss";
+#else
+    const string k_RelayConnectionType = "dtls";
+#endif
+
     void Awake()
     {
         if (Instance != null && Instance != this)
@@ -43,13 +48,8 @@ public class RelayManager : MonoBehaviour
 
             // Configure transport
             UnityTransport transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
-            transport.SetRelayServerData(
-                allocation.RelayServer.IpV4,
-                (ushort)allocation.RelayServer.Port,
-                allocation.AllocationIdBytes,
-                allocation.Key,
-                allocation.ConnectionData
-            );
+            transport.UseWebSockets = k_RelayConnectionType == "wss";
+            transport.SetRelayServerData(allocation.ToRelayServerData(k_RelayConnectionType));
 
             if (!NetworkManager.Singleton.IsListening)
             {
@@ -80,14 +80,8 @@ public class RelayManager : MonoBehaviour
 
             // Configure transport
             UnityTransport transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
-            transport.SetRelayServerData(
-                joinAllocation.RelayServer.IpV4,
-                (ushort)joinAllocation.RelayServer.Port,
-                joinAllocation.AllocationIdBytes,
-                joinAllocation.Key,
-                joinAllocation.ConnectionData,
-                joinAllocation.HostConnectionData
-            );
+            transport.UseWebSockets = k_RelayConnectionType == "wss";
+            transport.SetRelayServerData(joinAllocation.ToRelayServerData(k_RelayConnectionType));
 
             if (!NetworkManager.Singleton.IsListening)
             {

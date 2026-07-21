@@ -9,22 +9,23 @@ using UnityEngine.UI;
 public class ScoreboardUI : MonoBehaviour
 {
     // Colors
-    static readonly Color BgOverlay = new Color(0, 0, 0, 0.6f);
-    static readonly Color BgCard = new Color(0.06f, 0.07f, 0.09f, 0.95f);
-    static readonly Color BgRow = new Color(0.09f, 0.1f, 0.13f, 0.9f);
-    static readonly Color BgRowLocal = new Color(0.22f, 0.53f, 0.84f, 0.12f);
-    static readonly Color BgHUD = new Color(0.06f, 0.07f, 0.09f, 0.85f);
-    static readonly Color AccentBlue = new Color(0.33f, 0.66f, 0.96f);
-    static readonly Color AccentGreen = new Color(0.23f, 0.43f, 0.07f);
-    static readonly Color AccentGreenText = new Color(0.6f, 0.87f, 0.35f);
-    static readonly Color AccentRed = new Color(0.89f, 0.29f, 0.29f);
-    static readonly Color AccentAmber = new Color(0.94f, 0.62f, 0.15f);
-    static readonly Color TextPrimary = new Color(0.91f, 0.93f, 0.95f);
-    static readonly Color TextSecondary = new Color(0.55f, 0.58f, 0.63f);
-    static readonly Color TextDim = new Color(0.35f, 0.38f, 0.43f);
-    static readonly Color BorderSubtle = new Color(1f, 1f, 1f, 0.08f);
+    static readonly Color BgOverlay = new Color32(7, 10, 13, 238);
+    static readonly Color BgCard = VanguardUITheme.BaseTransparent;
+    static readonly Color BgRow = VanguardUITheme.PanelSoft;
+    static readonly Color BgRowLocal = VanguardUITheme.AmberSoft;
+    static readonly Color BgHUD = VanguardUITheme.BaseTransparent;
+    static readonly Color AccentBlue = VanguardUITheme.Amber;
+    static readonly Color AccentGreen = VanguardUITheme.GreenSoft;
+    static readonly Color AccentGreenText = VanguardUITheme.Green;
+    static readonly Color AccentRed = VanguardUITheme.Red;
+    static readonly Color AccentAmber = VanguardUITheme.Amber;
+    static readonly Color TextPrimary = VanguardUITheme.Ink;
+    static readonly Color TextSecondary = VanguardUITheme.InkDim;
+    static readonly Color TextDim = VanguardUITheme.InkFaint;
+    static readonly Color BorderSubtle = VanguardUITheme.Border;
 
     Canvas m_Canvas;
+    VanguardMatchToolkit m_Toolkit;
     GameObject m_HudBar;
     GameObject m_ScoreboardPanel;
     GameObject m_MatchEndPanel;
@@ -35,6 +36,10 @@ public class ScoreboardUI : MonoBehaviour
     TextMeshProUGUI m_TimerText;
     TextMeshProUGUI m_KillsText;
     TextMeshProUGUI m_DeathsText;
+    TextMeshProUGUI m_HealthText;
+    TextMeshProUGUI m_AmmoText;
+    TextMeshProUGUI m_WeaponText;
+    Image m_HealthFill;
     TextMeshProUGUI m_ScoreboardTimerText;
     TextMeshProUGUI m_EndTitle;
     TextMeshProUGUI m_EndSubtitle;
@@ -46,6 +51,7 @@ public class ScoreboardUI : MonoBehaviour
     TextMeshProUGUI m_DeathSubtitleText;
     TextMeshProUGUI m_DeathTimerText;
     TextMeshProUGUI m_HitMarkerText;
+    TextMeshProUGUI m_CrosshairText;
     TextMeshProUGUI m_KillConfirmText;
     TextMeshProUGUI m_ProtectionText;
     TextMeshProUGUI m_PickupPromptText;
@@ -58,9 +64,11 @@ public class ScoreboardUI : MonoBehaviour
     GameObject m_CountdownPanel;
     GameObject m_PausePanel;
     GameObject m_KillFeedContainer;
+    CanvasGroup m_DamageVignetteGroup;
     GameFlowManager m_GameFlowManager;
     PlayerCharacterController m_LocalPlayer;
     Health m_LocalHealth;
+    PlayerWeaponsManager m_LocalWeapons;
 
     List<GameObject> m_ScoreRows = new List<GameObject>();
     List<GameObject> m_EndScoreRows = new List<GameObject>();
@@ -68,14 +76,21 @@ public class ScoreboardUI : MonoBehaviour
 
     bool m_MatchEndShown = false;
     bool m_DeathShown = false;
+    bool m_IsReturningToMenu;
     float m_RespawnCountdownEndTime = Mathf.NegativeInfinity;
     float m_HitMarkerVisibleUntil = Mathf.NegativeInfinity;
     float m_HitMarkerDuration = 0.16f;
     float m_KillConfirmVisibleUntil = Mathf.NegativeInfinity;
     float m_PickupFeedbackVisibleUntil = Mathf.NegativeInfinity;
+    float m_DamageFlashVisibleUntil = Mathf.NegativeInfinity;
+    float m_LastHealthValue = float.NaN;
+    float m_NextHudRefreshTime;
     int m_LastCountdownDisplayValue = -1;
+    int m_LastToolkitKillFeedCount = -1;
+    readonly List<string> m_ToolkitKillFeed = new List<string>();
 
     const string k_MasterVolumePrefsKey = "NetcodeFPS.MasterVolume";
+    const float k_HudRefreshInterval = 0.05f;
 
     [Header("Optional HUD Audio")]
     public AudioClip CountdownTickSfx;
@@ -86,6 +101,7 @@ public class ScoreboardUI : MonoBehaviour
 
     void Start()
     {
+        DisableLegacyHud();
         BuildUI();
         m_ScoreboardPanel.SetActive(false);
         m_MatchEndPanel.SetActive(false);
@@ -107,6 +123,15 @@ public class ScoreboardUI : MonoBehaviour
         GameFlowManager.OnPlayerKilled += OnPlayerKilled;
     }
 
+    void DisableLegacyHud()
+    {
+        GameObject legacyHud = GameObject.Find("HUD");
+        if (legacyHud != null)
+        {
+            legacyHud.SetActive(false);
+        }
+    }
+
     void Update()
     {
         if (m_GameFlowManager == null)
@@ -118,17 +143,24 @@ public class ScoreboardUI : MonoBehaviour
             m_GameFlowManager.IsMatchOver.OnValueChanged += OnMatchOverChanged;
         }
 
-        UpdateTimer();
-        UpdateMiniHUD();
-        UpdateDeathOverlay();
-        UpdateRespawnProtection();
-        UpdatePickupPrompt();
-        UpdatePickupFeedback();
-        UpdateCountdown();
+        float unscaledTime = Time.unscaledTime;
+        if (unscaledTime >= m_NextHudRefreshTime)
+        {
+            m_NextHudRefreshTime = unscaledTime + k_HudRefreshInterval;
+            UpdateTimer();
+            UpdateMiniHUD();
+            UpdateDeathOverlay();
+            UpdateRespawnProtection();
+            UpdatePickupPrompt();
+            UpdatePickupFeedback();
+            UpdateCountdown();
+            UpdateLowHealthWarning();
+            SyncToolkitUI();
+        }
+
         UpdateCombatFeedback();
         UpdateHelpInput();
         UpdatePauseInput();
-        UpdateLowHealthWarning();
 
         // Tab toggle scoreboard (not during match end)
         if (!m_MatchEndShown)
@@ -149,6 +181,12 @@ public class ScoreboardUI : MonoBehaviour
                     RestoreGameplayCursorIfNeeded();
                 }
             }
+        }
+
+        m_Toolkit?.Tick(unscaledTime);
+        if (m_Toolkit != null && m_Toolkit.IsRenderable && m_Canvas != null && m_Canvas.enabled)
+        {
+            m_Canvas.enabled = false;
         }
     }
 
@@ -185,11 +223,11 @@ public class ScoreboardUI : MonoBehaviour
         int playerCount = Mathf.Max(1, m_GameFlowManager.PlayerIds.Count);
 
         bool isWinner = localId == winnerId;
-        m_EndTitle.text = isWinner ? "You won!" : "Match over";
+        m_EndTitle.text = $"{GetDisplayName(winnerId).ToUpperInvariant()} WINS";
         m_EndTitle.color = isWinner ? AccentGreenText : TextPrimary;
-        m_EndSubtitle.text = $"{kills} kills, {deaths} deaths";
-        m_EndWinnerText.text = $"Winner: {GetDisplayName(winnerId)}  |  {GetMatchEndReason(winnerId)}";
-        m_EndPlacementText.text = $"Your placement: {FormatOrdinal(placement)} of {playerCount}";
+        m_EndSubtitle.text = GetMatchEndReason(winnerId).ToUpperInvariant();
+        m_EndWinnerText.text = $"YOUR RECORD · {kills} KILLS · {deaths} DEATHS";
+        m_EndPlacementText.text = $"PLACEMENT · {FormatOrdinal(placement).ToUpperInvariant()} OF {playerCount}";
         UpdateRoundControlButton();
 
         RefreshScoreboard(m_EndRowsContainer, m_EndScoreRows);
@@ -197,7 +235,7 @@ public class ScoreboardUI : MonoBehaviour
 
     void OnLocalShotConfirmed()
     {
-        ShowHitMarker("HIT", TextPrimary, 0.16f);
+        ShowHitMarker("×", TextPrimary, 0.16f);
     }
 
     void OnLocalShotBlocked()
@@ -218,6 +256,8 @@ public class ScoreboardUI : MonoBehaviour
     {
         m_LocalPlayer = player;
         m_LocalHealth = player != null ? player.GetComponent<Health>() : null;
+        m_LocalWeapons = player != null ? player.GetComponent<PlayerWeaponsManager>() : null;
+        m_LastHealthValue = m_LocalHealth != null ? m_LocalHealth.CurrentHealth.Value : float.NaN;
     }
 
     void OnLocalPickupConfirmed(Pickup pickup, PlayerCharacterController player)
@@ -248,7 +288,7 @@ public class ScoreboardUI : MonoBehaviour
 
         if (killerId == localId && victimId != killerId)
         {
-            m_KillConfirmText.text = "ELIMINATION";
+            m_KillConfirmText.text = $"ELIMINATED · {GetDisplayName(victimId).ToUpperInvariant()}";
             m_KillConfirmVisibleUntil = Time.time + 1.25f;
             m_KillConfirmText.gameObject.SetActive(true);
             PlayHudSfx(KillConfirmSfx, AudioUtility.AudioGroups.HUDObjective);
@@ -264,8 +304,8 @@ public class ScoreboardUI : MonoBehaviour
         m_RespawnCountdownEndTime = Time.time + GameFlowManager.RespawnDelay;
 
         string killerName = GetDisplayName(killerId);
-        m_DeathTitleText.text = victimId == killerId ? "You eliminated yourself" : "You were eliminated";
-        m_DeathSubtitleText.text = victimId == killerId ? "Watch your footing" : $"By {killerName}";
+        m_DeathTitleText.text = victimId == killerId ? "SELF ELIMINATION" : $"ELIMINATED BY {killerName.ToUpperInvariant()}";
+        m_DeathSubtitleText.text = victimId == killerId ? "Watch your footing" : "Re-entering the combat zone";
 
         m_DeathPanel.SetActive(true);
         SetCombatHudVisible(false);
@@ -473,6 +513,28 @@ public class ScoreboardUI : MonoBehaviour
 
         m_KillsText.text = kills.ToString();
         m_DeathsText.text = deaths.ToString();
+
+        if (m_LocalHealth != null)
+        {
+            float ratio = Mathf.Clamp01(m_LocalHealth.GetRatio());
+            m_HealthText.text = Mathf.CeilToInt(m_LocalHealth.CurrentHealth.Value).ToString();
+            m_HealthText.color = ratio <= 0.3f ? AccentRed : TextPrimary;
+            m_HealthFill.color = ratio <= 0.3f ? AccentRed : TextPrimary;
+            RectTransform fillRect = m_HealthFill.rectTransform;
+            fillRect.localScale = new Vector3(Mathf.Max(0.001f, ratio), 1f, 1f);
+        }
+
+        WeaponController activeWeapon = m_LocalWeapons != null ? m_LocalWeapons.GetActiveWeapon() : null;
+        if (activeWeapon != null)
+        {
+            m_WeaponText.text = activeWeapon.WeaponName.ToUpperInvariant();
+            m_AmmoText.text = $"{activeWeapon.GetCurrentAmmo()}<size=60%> / {activeWeapon.MaxAmmo}</size>";
+        }
+        else
+        {
+            m_WeaponText.text = "UNARMED";
+            m_AmmoText.text = "0";
+        }
     }
 
     void UpdateDeathOverlay()
@@ -599,14 +661,30 @@ public class ScoreboardUI : MonoBehaviour
         bool show = !m_DeathShown && !m_MatchEndShown && m_LocalHealth != null &&
             m_LocalHealth.CurrentHealth.Value > 0f && m_LocalHealth.IsCritical();
 
-        m_LowHealthText.gameObject.SetActive(show);
-        if (!show)
-            return;
+        if (m_LocalHealth != null)
+        {
+            float current = m_LocalHealth.CurrentHealth.Value;
+            if (!float.IsNaN(m_LastHealthValue) && current < m_LastHealthValue)
+            {
+                m_DamageFlashVisibleUntil = Time.time + 0.2f;
+            }
 
-        float alpha = Mathf.Lerp(0.42f, 1f, Mathf.PingPong(Time.time * 3.5f, 1f));
+            m_LastHealthValue = current;
+        }
+
+        m_LowHealthText.gameObject.SetActive(show);
+        float alpha = show
+            ? Mathf.Lerp(0.42f, 1f, Mathf.PingPong(Time.time * 3.5f, 1f))
+            : 0f;
         Color color = AccentRed;
         color.a = alpha;
         m_LowHealthText.color = color;
+
+        if (m_DamageVignetteGroup != null)
+        {
+            float flash = Time.time < m_DamageFlashVisibleUntil ? 1f : 0f;
+            m_DamageVignetteGroup.alpha = Mathf.Max(show ? alpha * 0.8f : 0f, flash);
+        }
     }
 
     void RefreshScoreboard(GameObject container, List<GameObject> rows)
@@ -618,13 +696,13 @@ public class ScoreboardUI : MonoBehaviour
 
         List<PlayerScoreData> players = GetSortedPlayers();
         ulong localId = NetworkManager.Singleton.LocalClientId;
-        float yPos = -35;
+        float yPos = 62f;
 
         for (int i = 0; i < players.Count; i++)
         {
             bool isLocal = players[i].ClientId == localId;
             CreateScoreRow(container, rows, players[i], i + 1, isLocal, yPos);
-            yPos -= 42;
+            yPos -= 68f;
         }
     }
 
@@ -738,91 +816,130 @@ public class ScoreboardUI : MonoBehaviour
         m_Canvas.sortingOrder = 50;
 
         var scaler = canvasObj.AddComponent<CanvasScaler>();
-        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1920, 1080);
-        scaler.matchWidthOrHeight = 0.5f;
+        VanguardUITheme.ConfigureScaler(scaler);
 
         canvasObj.AddComponent<GraphicRaycaster>();
 
-        BuildHUD(canvasObj);
-        BuildCombatFeedback(canvasObj);
-        BuildDeathOverlay(canvasObj);
-        BuildCountdownOverlay(canvasObj);
-        BuildScoreboardOverlay(canvasObj);
-        BuildMatchEndOverlay(canvasObj);
-        BuildHelpOverlay(canvasObj);
-        BuildPauseOverlay(canvasObj);
+        GameObject safeArea = VanguardUITheme.CreateSafeArea(canvasObj);
+        BuildHUD(safeArea);
+        BuildCombatFeedback(safeArea);
+        BuildDeathOverlay(safeArea);
+        BuildCountdownOverlay(safeArea);
+        BuildScoreboardOverlay(safeArea);
+        BuildMatchEndOverlay(safeArea);
+        BuildHelpOverlay(safeArea);
+        BuildPauseOverlay(safeArea);
+
+        m_Toolkit = new VanguardMatchToolkit(this);
     }
 
     void BuildHUD(GameObject canvas)
     {
-        // HUD bar
-        m_HudBar = CreatePanel(canvas, "HUDBar", BgHUD,
-            new Vector2(0, -30), new Vector2(260, 44),
-            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f));
+        m_HudBar = new GameObject("HUD");
+        m_HudBar.transform.SetParent(canvas.transform, false);
+        m_HudBar.AddComponent<RectTransform>();
 
-        // Kills section (left)
-        GameObject killBadge = CreatePanel(m_HudBar, "KBadge",
-            new Color(AccentBlue.r, AccentBlue.g, AccentBlue.b, 0.15f),
-            new Vector2(-95, 0), new Vector2(24, 18));
-        CreateText(killBadge, "KLabel", "K", 10,
-            AccentBlue, FontStyles.Bold, Vector2.zero, new Vector2(24, 18));
+        GameObject stats = CreatePanel(m_HudBar, "CombatStats", BgHUD,
+            new Vector2(64f, -56f), new Vector2(208f, 82f),
+            new Vector2(0f, 1f), new Vector2(0f, 1f));
+        AddOutline(stats, BorderSubtle);
+        CreateText(stats, "KLabel", "K", 12, TextSecondary, FontStyles.Bold,
+            new Vector2(-70f, 0f), new Vector2(26f, 46f));
+        m_KillsText = CreateText(stats, "Kills", "0", 27, TextPrimary, FontStyles.Bold,
+            new Vector2(-42f, 0f), new Vector2(42f, 46f));
+        CreateImage(stats, "Divider", BorderSubtle, Vector2.zero, new Vector2(2f, 48f));
+        CreateText(stats, "DLabel", "D", 12, TextSecondary, FontStyles.Bold,
+            new Vector2(42f, 0f), new Vector2(26f, 46f));
+        m_DeathsText = CreateText(stats, "Deaths", "0", 27, TextPrimary, FontStyles.Bold,
+            new Vector2(72f, 0f), new Vector2(42f, 46f));
 
-        m_KillsText = CreateText(m_HudBar, "Kills", "0", 22,
-            TextPrimary, FontStyles.Bold, new Vector2(-62, 0), new Vector2(40, 40));
+        m_TimerText = CreateText(m_HudBar, "Timer", "03:00", 40,
+            TextPrimary, FontStyles.Bold, new Vector2(0f, -48f), new Vector2(230f, 58f),
+            TextAlignmentOptions.Center, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f));
+        TextMeshProUGUI mode = CreateText(m_HudBar, "Mode", "DEATHMATCH · FIRST TO 30", 12,
+            TextSecondary, FontStyles.Bold, new Vector2(0f, -90f), new Vector2(360f, 26f),
+            TextAlignmentOptions.Center, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f));
+        mode.characterSpacing = 3f;
 
-        // Timer (center) with borders
-        CreateImage(m_HudBar, "DivL", BorderSubtle, new Vector2(-35, 0), new Vector2(1, 30));
-        m_TimerText = CreateText(m_HudBar, "Timer", "03:00", 22,
-            TextPrimary, FontStyles.Bold, new Vector2(0, 0), new Vector2(80, 40));
-        CreateImage(m_HudBar, "DivR", BorderSubtle, new Vector2(35, 0), new Vector2(1, 30));
+        GameObject health = CreatePanel(m_HudBar, "Health", BgHUD,
+            new Vector2(64f, 54f), new Vector2(424f, 94f),
+            new Vector2(0f, 0f), new Vector2(0f, 0f));
+        AddOutline(health, BorderSubtle);
+        CreateText(health, "Heart", "♡", 34, TextPrimary, FontStyles.Normal,
+            new Vector2(-158f, 0f), new Vector2(54f, 54f));
+        GameObject healthTrack = CreatePanel(health, "Track", new Color32(243, 242, 242, 45),
+            new Vector2(-18f, 0f), new Vector2(240f, 16f));
+        GameObject healthFill = CreatePanel(healthTrack, "Fill", TextPrimary,
+            new Vector2(-120f, 0f), new Vector2(240f, 16f));
+        RectTransform healthFillRect = healthFill.GetComponent<RectTransform>();
+        healthFillRect.anchorMin = new Vector2(0f, 0.5f);
+        healthFillRect.anchorMax = new Vector2(0f, 0.5f);
+        healthFillRect.pivot = new Vector2(0f, 0.5f);
+        healthFillRect.anchoredPosition = new Vector2(-120f, 0f);
+        m_HealthFill = healthFill.GetComponent<Image>();
+        m_HealthText = CreateText(health, "Value", "100", 28, TextPrimary, FontStyles.Bold,
+            new Vector2(158f, 0f), new Vector2(78f, 54f));
 
-        // Deaths section (right)
-        m_DeathsText = CreateText(m_HudBar, "Deaths", "0", 22,
-            TextPrimary, FontStyles.Bold, new Vector2(62, 0), new Vector2(40, 40));
-
-        GameObject deathBadge = CreatePanel(m_HudBar, "DBadge",
-            new Color(AccentRed.r, AccentRed.g, AccentRed.b, 0.15f),
-            new Vector2(95, 0), new Vector2(24, 18));
-        CreateText(deathBadge, "DLabel", "D", 10,
-            AccentRed, FontStyles.Bold, Vector2.zero, new Vector2(24, 18));
-
-        // Tab hint
-        CreateText(canvas, "TabHint", "Tab  Scoreboard", 10,
-            TextDim, FontStyles.Normal, new Vector2(0, -60),
-            new Vector2(160, 16), TextAlignmentOptions.Center,
-            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f));
-
-        CreateText(canvas, "HelpHint", "F1  Rules", 10,
-            TextDim, FontStyles.Normal, new Vector2(0, -78),
-            new Vector2(160, 16), TextAlignmentOptions.Center,
-            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f));
+        GameObject ammo = CreatePanel(m_HudBar, "Ammo", BgHUD,
+            new Vector2(-68f, 54f), new Vector2(270f, 116f),
+            new Vector2(1f, 0f), new Vector2(1f, 0f));
+        AddOutline(ammo, BorderSubtle);
+        m_WeaponText = CreateText(ammo, "Weapon", "ASSAULT RIFLE", 11, TextSecondary, FontStyles.Bold,
+            new Vector2(0f, 30f), new Vector2(230f, 24f), TextAlignmentOptions.Right);
+        m_AmmoText = CreateText(ammo, "AmmoValue", "24 / 90", 30, TextPrimary, FontStyles.Bold,
+            new Vector2(0f, -12f), new Vector2(230f, 50f), TextAlignmentOptions.Right);
     }
 
     void BuildCombatFeedback(GameObject canvas)
     {
-        m_HitMarkerText = CreateText(canvas, "HitMarker", "X", 28,
+        GameObject vignette = new GameObject("DamageVignette");
+        vignette.transform.SetParent(canvas.transform, false);
+        RectTransform vignetteRect = vignette.AddComponent<RectTransform>();
+        vignetteRect.anchorMin = Vector2.zero;
+        vignetteRect.anchorMax = Vector2.one;
+        vignetteRect.offsetMin = Vector2.zero;
+        vignetteRect.offsetMax = Vector2.zero;
+        m_DamageVignetteGroup = vignette.AddComponent<CanvasGroup>();
+        m_DamageVignetteGroup.alpha = 0f;
+        CreatePanel(vignette, "Top", VanguardUITheme.RedSoft, new Vector2(0f, -70f), new Vector2(0f, 140f),
+            new Vector2(0f, 1f), new Vector2(1f, 1f));
+        CreatePanel(vignette, "Bottom", VanguardUITheme.RedSoft, new Vector2(0f, 70f), new Vector2(0f, 140f),
+            new Vector2(0f, 0f), new Vector2(1f, 0f));
+        CreatePanel(vignette, "Left", VanguardUITheme.RedSoft, new Vector2(70f, 0f), new Vector2(140f, 0f),
+            new Vector2(0f, 0f), new Vector2(0f, 1f));
+        CreatePanel(vignette, "Right", VanguardUITheme.RedSoft, new Vector2(-70f, 0f), new Vector2(140f, 0f),
+            new Vector2(1f, 0f), new Vector2(1f, 1f));
+        vignette.transform.SetAsFirstSibling();
+
+        m_CrosshairText = CreateText(canvas, "Crosshair", "+", 24,
+            TextPrimary, FontStyles.Normal, Vector2.zero, new Vector2(48, 48));
+        m_CrosshairText.raycastTarget = false;
+
+        m_HitMarkerText = CreateText(canvas, "HitMarker", "×", 30,
             new Color(1f, 1f, 1f, 0f), FontStyles.Bold, Vector2.zero, new Vector2(60, 60));
         m_HitMarkerText.raycastTarget = false;
 
-        m_KillConfirmText = CreateText(canvas, "KillConfirm", "ELIMINATION", 18,
-            AccentAmber, FontStyles.Bold, new Vector2(0, -96), new Vector2(260, 32));
+        m_KillConfirmText = CreateText(canvas, "KillConfirm", "ELIMINATED", 15,
+            AccentAmber, FontStyles.Bold, new Vector2(0, -74), new Vector2(300, 32));
         m_KillConfirmText.raycastTarget = false;
 
         m_ProtectionText = CreateText(canvas, "RespawnProtection", "PROTECTED", 14,
-            AccentBlue, FontStyles.Bold, new Vector2(0, -132), new Vector2(260, 28));
+            AccentBlue, FontStyles.Bold, new Vector2(0, -112), new Vector2(260, 28));
         m_ProtectionText.raycastTarget = false;
 
-        m_PickupPromptText = CreateText(canvas, "PickupPrompt", "PICKUP", 13,
-            TextSecondary, FontStyles.Bold, new Vector2(0, -176), new Vector2(300, 26));
+        m_PickupPromptText = CreateText(canvas, "PickupPrompt", "E  PICK UP", 15,
+            TextPrimary, FontStyles.Normal, new Vector2(0, -324), new Vector2(420, 58));
+        AddOutline(m_PickupPromptText.gameObject, AccentAmber);
         m_PickupPromptText.raycastTarget = false;
 
         m_PickupFeedbackText = CreateText(canvas, "PickupFeedback", "+ PICKUP", 16,
-            AccentGreenText, FontStyles.Bold, new Vector2(0, -206), new Vector2(320, 30));
+            AccentGreenText, FontStyles.Bold, new Vector2(0, -128), new Vector2(420, 40),
+            TextAlignmentOptions.Center, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f));
         m_PickupFeedbackText.raycastTarget = false;
 
-        m_LowHealthText = CreateText(canvas, "LowHealth", "LOW HEALTH", 16,
-            AccentRed, FontStyles.Bold, new Vector2(0, -246), new Vector2(320, 30));
+        m_LowHealthText = CreateText(canvas, "LowHealth", "CRITICAL · FIND COVER", 14,
+            AccentRed, FontStyles.Bold, new Vector2(0, 116), new Vector2(360, 34),
+            TextAlignmentOptions.Center, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f));
         m_LowHealthText.raycastTarget = false;
 
         m_KillFeedContainer = new GameObject("KillFeed");
@@ -831,26 +948,31 @@ public class ScoreboardUI : MonoBehaviour
         feedRect.anchorMin = new Vector2(1f, 1f);
         feedRect.anchorMax = new Vector2(1f, 1f);
         feedRect.pivot = new Vector2(1f, 1f);
-        feedRect.anchoredPosition = new Vector2(-24, -92);
-        feedRect.sizeDelta = new Vector2(360, 220);
+        feedRect.anchoredPosition = new Vector2(-64, -56);
+        feedRect.sizeDelta = new Vector2(420, 240);
     }
 
     void BuildDeathOverlay(GameObject canvas)
     {
         m_DeathPanel = CreatePanel(canvas, "DeathOverlay",
-            new Color(0f, 0f, 0f, 0.34f), Vector2.zero, new Vector2(1920, 1080));
+            new Color(6f / 255f, 8f / 255f, 10f / 255f, 0.72f), Vector2.zero, new Vector2(2400, 1400));
+        VanguardUITheme.AddCornerFrame(m_DeathPanel);
 
-        GameObject notice = CreatePanel(m_DeathPanel, "DeathNotice",
-            new Color(0.05f, 0.055f, 0.07f, 0.86f), new Vector2(0, -20), new Vector2(360, 150));
+        GameObject notice = new GameObject("DeathNotice");
+        notice.transform.SetParent(m_DeathPanel.transform, false);
+        notice.AddComponent<RectTransform>().sizeDelta = new Vector2(920f, 360f);
 
-        m_DeathTitleText = CreateText(notice, "DeathTitle", "You were eliminated", 22,
-            TextPrimary, FontStyles.Bold, new Vector2(0, 40), new Vector2(320, 34));
+        CreateText(notice, "Eyebrow", "COMBAT STATUS", 13, AccentRed, FontStyles.Bold,
+            new Vector2(0f, 130f), new Vector2(360f, 24f));
+        m_DeathTitleText = CreateText(notice, "DeathTitle", "ELIMINATED", 38,
+            TextPrimary, FontStyles.Bold, new Vector2(0, 82), new Vector2(820, 54));
 
         m_DeathSubtitleText = CreateText(notice, "DeathSubtitle", "By Player", 14,
-            TextSecondary, FontStyles.Normal, new Vector2(0, 8), new Vector2(320, 24));
+            TextSecondary, FontStyles.Normal, new Vector2(0, 30), new Vector2(720, 30));
 
         m_DeathTimerText = CreateText(notice, "DeathTimer", "Respawning in 3.0s", 16,
-            AccentAmber, FontStyles.Bold, new Vector2(0, -36), new Vector2(320, 28));
+            AccentAmber, FontStyles.Bold, new Vector2(0, -64), new Vector2(360, 80));
+        AddOutline(m_DeathTimerText.gameObject, AccentAmber);
 
         m_DeathTitleText.raycastTarget = false;
         m_DeathSubtitleText.raycastTarget = false;
@@ -860,14 +982,14 @@ public class ScoreboardUI : MonoBehaviour
     void BuildCountdownOverlay(GameObject canvas)
     {
         m_CountdownPanel = CreatePanel(canvas, "CountdownOverlay",
-            new Color(0f, 0f, 0f, 0.18f), Vector2.zero, new Vector2(1920, 1080));
+            new Color(0f, 0f, 0f, 0.32f), Vector2.zero, new Vector2(2400, 1400));
         m_CountdownPanel.SetActive(false);
 
         m_CountdownLabelText = CreateText(m_CountdownPanel, "CountdownLabel", "GET READY", 18,
-            TextSecondary, FontStyles.Bold, new Vector2(0, 92), new Vector2(260, 32));
+            AccentAmber, FontStyles.Bold, new Vector2(0, 112), new Vector2(360, 32));
 
         m_CountdownText = CreateText(m_CountdownPanel, "CountdownValue", "3", 86,
-            TextPrimary, FontStyles.Bold, new Vector2(0, 20), new Vector2(220, 120));
+            TextPrimary, FontStyles.Bold, new Vector2(0, 12), new Vector2(220, 140));
         m_CountdownText.raycastTarget = false;
         m_CountdownLabelText.raycastTarget = false;
     }
@@ -875,197 +997,227 @@ public class ScoreboardUI : MonoBehaviour
     void BuildScoreboardOverlay(GameObject canvas)
     {
         m_ScoreboardPanel = CreatePanel(canvas, "ScoreOverlay", BgOverlay,
-            Vector2.zero, new Vector2(1920, 1080));
+            Vector2.zero, new Vector2(2400, 1400));
+        VanguardUITheme.AddCornerFrame(m_ScoreboardPanel);
 
-        GameObject board = CreatePanel(m_ScoreboardPanel, "Board", BgCard,
-            new Vector2(0, 40), new Vector2(520, 360));
+        GameObject board = new GameObject("Board");
+        board.transform.SetParent(m_ScoreboardPanel.transform, false);
+        board.AddComponent<RectTransform>().sizeDelta = new Vector2(1600f, 780f);
 
         m_ScoreboardTimerText = CreateText(board, "SBTimer",
-            "Scoreboard \u2014 03:00 remaining", 12,
-            TextSecondary, FontStyles.Normal, new Vector2(0, 155), new Vector2(480, 20));
+            "DEATHMATCH · 03:00 REMAINING", 16,
+            AccentAmber, FontStyles.Normal, new Vector2(0, 334), new Vector2(760, 28));
 
         // Column headers
-        CreateScoreHeader(board, 130);
+        CreateScoreHeader(board, 262);
 
         // Rows container
         m_RowsContainer = new GameObject("Rows");
         m_RowsContainer.transform.SetParent(board.transform, false);
         RectTransform rowsRect = m_RowsContainer.AddComponent<RectTransform>();
-        rowsRect.anchoredPosition = new Vector2(0, 60);
-        rowsRect.sizeDelta = new Vector2(480, 240);
+        rowsRect.anchoredPosition = new Vector2(0, 142);
+        rowsRect.sizeDelta = new Vector2(1600, 360);
 
         // Footer
-        CreateText(board, "Footer", "Deathmatch \u2014 Most kills when time expires wins", 10,
-            TextDim, FontStyles.Normal, new Vector2(0, -160), new Vector2(480, 16));
+        CreateText(board, "Footer", "HOLD TAB TO VIEW · RELEASE TO RETURN TO MATCH", 12,
+            TextSecondary, FontStyles.Bold, new Vector2(0, -344), new Vector2(760, 24));
     }
 
     void BuildMatchEndOverlay(GameObject canvas)
     {
         m_MatchEndPanel = CreatePanel(canvas, "MatchEndOverlay", BgOverlay,
-            Vector2.zero, new Vector2(1920, 1080));
+            Vector2.zero, new Vector2(2400, 1400));
+        VanguardUITheme.AddCornerFrame(m_MatchEndPanel);
 
         GameObject board = CreatePanel(m_MatchEndPanel, "EndBoard", BgCard,
-            new Vector2(0, 60), new Vector2(560, 500));
+            new Vector2(0, 30), new Vector2(1180, 820));
+        AddOutline(board, BorderSubtle);
 
         // Match complete label
         CreateText(board, "EndLabel", "Match complete", 11,
-            TextDim, FontStyles.Normal, new Vector2(0, 218), new Vector2(500, 16));
+            AccentAmber, FontStyles.Bold, new Vector2(0, 354), new Vector2(500, 20));
 
         // Winner title
-        m_EndTitle = CreateText(board, "EndTitle", "You won!", 26,
-            AccentGreenText, FontStyles.Bold, new Vector2(0, 190), new Vector2(500, 35));
+        m_EndTitle = CreateText(board, "EndTitle", "You won!", 42,
+            TextPrimary, FontStyles.Bold, new Vector2(0, 304), new Vector2(900, 58));
 
         // Stats subtitle
         m_EndSubtitle = CreateText(board, "EndStats", "0 kills, 0 deaths", 14,
-            TextSecondary, FontStyles.Normal, new Vector2(0, 162), new Vector2(500, 20));
+            TextSecondary, FontStyles.Normal, new Vector2(0, 254), new Vector2(700, 24));
 
         m_EndWinnerText = CreateText(board, "EndWinner", "Winner: Player",
-            13, AccentAmber, FontStyles.Bold, new Vector2(0, 136), new Vector2(500, 20));
+            15, AccentAmber, FontStyles.Bold, new Vector2(0, 218), new Vector2(880, 24));
 
         m_EndPlacementText = CreateText(board, "EndPlacement", "Your placement: 1st of 1",
-            13, TextSecondary, FontStyles.Normal, new Vector2(0, 113), new Vector2(500, 20));
+            14, TextSecondary, FontStyles.Normal, new Vector2(0, 184), new Vector2(700, 24));
 
         // Divider
-        CreateImage(board, "EndDiv", BorderSubtle, new Vector2(0, 95), new Vector2(500, 1));
+        CreateImage(board, "EndDiv", BorderSubtle, new Vector2(0, 158), new Vector2(1080, 2));
 
         // Column headers
-        CreateScoreHeader(board, 78);
+        CreateScoreHeader(board, 128);
 
         // Rows container
         m_EndRowsContainer = new GameObject("EndRows");
         m_EndRowsContainer.transform.SetParent(board.transform, false);
         RectTransform rowsRect = m_EndRowsContainer.AddComponent<RectTransform>();
-        rowsRect.anchoredPosition = new Vector2(0, 8);
-        rowsRect.sizeDelta = new Vector2(500, 220);
+        rowsRect.anchoredPosition = new Vector2(0, 16);
+        rowsRect.sizeDelta = new Vector2(1080, 250);
 
         // Buttons
-        float btnY = -190;
+        float btnY = -316;
 
         Button playAgain = CreateButton(board, "PlayAgain", "Start next round",
-            TextPrimary, new Color(0.05f, 0.27f, 0.49f),
-            new Vector2(0, btnY), new Vector2(500, 44));
+            new Color32(26, 18, 6, 255), AccentAmber,
+            new Vector2(290, btnY), new Vector2(500, 64));
         m_PlayAgainButton = playAgain;
         m_PlayAgainButtonLabel = playAgain.GetComponentInChildren<TextMeshProUGUI>();
         m_PlayAgainButton.onClick.AddListener(OnPlayAgain);
 
         Button backToMenu = CreateButton(board, "BackMenu", "Back to menu",
-            TextSecondary, new Color(0.09f, 0.1f, 0.13f),
-            new Vector2(0, btnY - 50), new Vector2(500, 40));
+            TextSecondary, Color.clear,
+            new Vector2(-290, btnY), new Vector2(500, 64));
+        AddOutline(backToMenu.gameObject, BorderSubtle);
         backToMenu.onClick.AddListener(OnBackToMenu);
     }
 
     void BuildHelpOverlay(GameObject canvas)
     {
         m_HelpPanel = CreatePanel(canvas, "HelpOverlay",
-            new Color(0f, 0f, 0f, 0.58f), Vector2.zero, new Vector2(1920, 1080));
+            BgOverlay, Vector2.zero, new Vector2(2400, 1400));
+        VanguardUITheme.AddCornerFrame(m_HelpPanel);
 
         GameObject board = CreatePanel(m_HelpPanel, "HelpBoard", BgCard,
-            new Vector2(0, 35), new Vector2(600, 390));
+            new Vector2(0, 35), new Vector2(920, 600));
+        AddOutline(board, BorderSubtle);
 
         CreateText(board, "HelpLabel", "Quick reference", 11,
-            TextDim, FontStyles.Normal, new Vector2(0, 164), new Vector2(520, 18));
+            AccentAmber, FontStyles.Bold, new Vector2(0, 252), new Vector2(760, 20));
 
         CreateText(board, "HelpTitle", "Deathmatch Rules", 24,
-            TextPrimary, FontStyles.Bold, new Vector2(0, 132), new Vector2(520, 34));
+            TextPrimary, FontStyles.Bold, new Vector2(0, 208), new Vector2(760, 42));
 
         TextMeshProUGUI objective = CreateText(board, "Objective",
             "Most kills when the timer ends wins. If kills are tied, fewer deaths decides the winner. Score limit ends the round early.",
-            13, TextSecondary, FontStyles.Normal, new Vector2(0, 88), new Vector2(520, 52));
+            14, TextSecondary, FontStyles.Normal, new Vector2(0, 148), new Vector2(760, 62));
         objective.textWrappingMode = TextWrappingModes.Normal;
 
-        CreateImage(board, "HelpDiv", BorderSubtle, new Vector2(0, 52), new Vector2(520, 1));
+        CreateImage(board, "HelpDiv", BorderSubtle, new Vector2(0, 98), new Vector2(800, 2));
 
         TextMeshProUGUI controls = CreateText(board, "Controls",
             "WASD        Move\nMouse       Aim\nLeft Click  Fire\nR           Reload\n1-3/Scroll  Switch weapon",
-            13, TextPrimary, FontStyles.Normal, new Vector2(-145, -25), new Vector2(230, 135),
+            14, TextPrimary, FontStyles.Normal, new Vector2(-230, -24), new Vector2(330, 210),
             TextAlignmentOptions.Left);
         controls.textWrappingMode = TextWrappingModes.NoWrap;
 
         TextMeshProUGUI gameplay = CreateText(board, "Gameplay",
             "E           Pick up\nTab         Scoreboard\nF1 or H     Rules\nEsc         Close this panel\nRespawn     3 seconds + protection",
-            13, TextPrimary, FontStyles.Normal, new Vector2(155, -25), new Vector2(260, 135),
+            14, TextPrimary, FontStyles.Normal, new Vector2(235, -24), new Vector2(360, 210),
             TextAlignmentOptions.Left);
         gameplay.textWrappingMode = TextWrappingModes.NoWrap;
 
         CreateText(board, "HelpFooter", "Pickups reset every round. Host controls the next round.",
-            11, TextDim, FontStyles.Normal, new Vector2(0, -168), new Vector2(520, 18));
+            11, TextDim, FontStyles.Normal, new Vector2(0, -260), new Vector2(760, 20));
     }
 
     void BuildPauseOverlay(GameObject canvas)
     {
         m_PausePanel = CreatePanel(canvas, "PauseOverlay",
-            new Color(0f, 0f, 0f, 0.62f), Vector2.zero, new Vector2(1920, 1080));
+            BgOverlay, Vector2.zero, new Vector2(2400, 1400));
+        VanguardUITheme.AddCornerFrame(m_PausePanel);
 
         GameObject board = CreatePanel(m_PausePanel, "PauseBoard", BgCard,
-            new Vector2(0, 35), new Vector2(520, 430));
+            new Vector2(0, 25), new Vector2(1280, 770));
+        AddOutline(board, BorderSubtle);
 
-        CreateText(board, "PauseLabel", "Match paused locally", 11,
-            TextDim, FontStyles.Normal, new Vector2(0, 176), new Vector2(460, 18));
+        CreateText(board, "PauseLabel", "MATCH PAUSED", 14,
+            AccentAmber, FontStyles.Bold, new Vector2(-514, 316), new Vector2(220, 22),
+            TextAlignmentOptions.Left);
 
-        CreateText(board, "PauseTitle", "Options", 26,
-            TextPrimary, FontStyles.Bold, new Vector2(0, 142), new Vector2(460, 36));
+        CreateText(board, "PauseTitle", "Settings", 34,
+            TextPrimary, FontStyles.Bold, new Vector2(-446, 266), new Vector2(360, 46),
+            TextAlignmentOptions.Left);
 
-        Button resumeButton = CreateButton(board, "ResumeButton", "Resume",
-            TextPrimary, new Color(0.05f, 0.27f, 0.49f), new Vector2(0, 88), new Vector2(440, 44));
+        GameObject gameplayTab = CreatePanel(board, "GameplayTab", AccentAmber,
+            new Vector2(-426, 194), new Vector2(426, 76));
+        CreateText(gameplayTab, "Label", "GAMEPLAY", 14, new Color32(26, 18, 6, 255), FontStyles.Bold,
+            Vector2.zero, new Vector2(400, 70));
+        CreateText(board, "AudioTab", "AUDIO", 14, TextSecondary, FontStyles.Bold,
+            new Vector2(0, 194), new Vector2(426, 76));
+        CreateText(board, "VideoTab", "VIDEO", 14, TextSecondary, FontStyles.Bold,
+            new Vector2(426, 194), new Vector2(426, 76));
+        CreateImage(board, "TabsRule", BorderSubtle, new Vector2(0, 155), new Vector2(1280, 2));
+
+        Button resumeButton = CreateButton(board, "ResumeButton", "RESUME",
+            new Color32(26, 18, 6, 255), AccentAmber, new Vector2(480, -310), new Vector2(250, 64));
         resumeButton.onClick.AddListener(() => SetPauseOverlayVisible(false));
 
         CreateSettingsStepper(board, "Sensitivity", "Mouse sensitivity",
-            new Vector2(0, 24), out m_SensitivityValueText,
+            new Vector2(0, 92), out m_SensitivityValueText,
             () => AdjustLookSensitivity(-0.1f), () => AdjustLookSensitivity(0.1f));
 
         CreateSettingsStepper(board, "Volume", "Master volume",
-            new Vector2(0, -48), out m_MasterVolumeValueText,
+            new Vector2(0, 10), out m_MasterVolumeValueText,
             () => AdjustMasterVolume(-0.1f), () => AdjustMasterVolume(0.1f));
 
-        Button fullscreenButton = CreateButton(board, "FullscreenButton", "Toggle fullscreen",
-            TextSecondary, BgRow, new Vector2(0, -112), new Vector2(440, 38));
+        Button fullscreenButton = CreateButton(board, "FullscreenButton", "FULLSCREEN",
+            TextPrimary, Color.clear, new Vector2(0, -78), new Vector2(1120, 56));
+        AddOutline(fullscreenButton.gameObject, BorderSubtle);
         fullscreenButton.onClick.AddListener(ToggleFullscreen);
 
-        Button leaveButton = CreateButton(board, "LeaveMatchButton", "Leave match",
-            AccentRed, BgRow, new Vector2(0, -164), new Vector2(440, 38));
+        CreateImage(board, "FooterRule", BorderSubtle, new Vector2(0, -258), new Vector2(1280, 2));
+        Button leaveButton = CreateButton(board, "LeaveMatchButton", "LEAVE MATCH",
+            AccentRed, Color.clear, new Vector2(-470, -310), new Vector2(286, 64));
+        AddOutline(leaveButton.gameObject, AccentRed);
         leaveButton.onClick.AddListener(OnBackToMenu);
     }
 
     void CreateSettingsStepper(GameObject parent, string name, string label, Vector2 position,
         out TextMeshProUGUI valueText, UnityEngine.Events.UnityAction onMinus, UnityEngine.Events.UnityAction onPlus)
     {
-        GameObject row = CreatePanel(parent, name, BgRow, position, new Vector2(440, 54));
+        GameObject row = new GameObject(name);
+        row.transform.SetParent(parent.transform, false);
+        RectTransform rowRect = row.AddComponent<RectTransform>();
+        rowRect.anchoredPosition = position;
+        rowRect.sizeDelta = new Vector2(1120, 64);
 
-        CreateText(row, $"{name}Label", label, 12,
-            TextSecondary, FontStyles.Normal, new Vector2(-125, 0), new Vector2(150, 24), TextAlignmentOptions.Left);
+        CreateText(row, $"{name}Label", label, 16,
+            TextPrimary, FontStyles.Normal, new Vector2(-400, 0), new Vector2(300, 32), TextAlignmentOptions.Left);
 
-        Button minus = CreateButton(row, $"{name}Minus", "-", TextPrimary, BgHUD,
-            new Vector2(62, 0), new Vector2(38, 30));
+        Button minus = CreateButton(row, $"{name}Minus", "−", TextPrimary, Color.clear,
+            new Vector2(360, 0), new Vector2(50, 42));
+        AddOutline(minus.gameObject, BorderSubtle);
         minus.onClick.AddListener(onMinus);
 
-        valueText = CreateText(row, $"{name}Value", "1.0", 13,
-            TextPrimary, FontStyles.Bold, new Vector2(116, 0), new Vector2(64, 30));
+        valueText = CreateText(row, $"{name}Value", "1.0", 17,
+            AccentAmber, FontStyles.Bold, new Vector2(438, 0), new Vector2(80, 36));
 
-        Button plus = CreateButton(row, $"{name}Plus", "+", TextPrimary, BgHUD,
-            new Vector2(170, 0), new Vector2(38, 30));
+        Button plus = CreateButton(row, $"{name}Plus", "+", TextPrimary, Color.clear,
+            new Vector2(520, 0), new Vector2(50, 42));
+        AddOutline(plus.gameObject, BorderSubtle);
         plus.onClick.AddListener(onPlus);
     }
 
     void CreateScoreHeader(GameObject parent, float yPos)
     {
-        float[] xPositions = { -210, -120, 100, 170, 220 };
-        string[] labels = { "#", "Player", "Kills", "Deaths", "K/D" };
+        float[] xPositions = { -500, -402, 220, 342, 468 };
+        string[] labels = { "#", "PLAYER", "K", "D", "K/D" };
         TextAlignmentOptions[] aligns = {
             TextAlignmentOptions.Center, TextAlignmentOptions.Left,
             TextAlignmentOptions.Center, TextAlignmentOptions.Center,
             TextAlignmentOptions.Center
         };
-        float[] widths = { 30, 160, 60, 60, 50 };
+        float[] widths = { 42, 420, 80, 80, 90 };
 
         for (int i = 0; i < labels.Length; i++)
         {
-            CreateText(parent, $"H_{labels[i]}", labels[i], 10,
-                TextDim, FontStyles.Normal, new Vector2(xPositions[i], yPos),
-                new Vector2(widths[i], 16), aligns[i]);
+            CreateText(parent, $"H_{labels[i]}", labels[i], 12,
+                TextSecondary, FontStyles.Bold, new Vector2(xPositions[i], yPos),
+                new Vector2(widths[i], 20), aligns[i]);
         }
 
         CreateImage(parent, "HeaderDiv", BorderSubtle,
-            new Vector2(0, yPos - 12), new Vector2(480, 1));
+            new Vector2(0, yPos - 28), new Vector2(1080, 2));
     }
 
     void CreateScoreRow(GameObject parent, List<GameObject> rows,
@@ -1075,36 +1227,36 @@ public class ScoreboardUI : MonoBehaviour
         Color nameColor = isLocal ? AccentBlue : TextPrimary;
 
         GameObject row = CreatePanel(parent, $"Row_{data.ClientId}", rowBg,
-            new Vector2(0, yPos), new Vector2(480, 36));
+            new Vector2(0, yPos), new Vector2(1080, 64));
         rows.Add(row);
 
         // Rank
         CreateText(row, "Rank", rank.ToString(), 14,
             rank == 1 ? AccentBlue : TextSecondary, FontStyles.Bold,
-            new Vector2(-210, 0), new Vector2(30, 32), TextAlignmentOptions.Center);
+            new Vector2(-500, 0), new Vector2(42, 58), TextAlignmentOptions.Center);
 
         // Name
-        string playerName = isLocal ? "You" : $"Player {data.ClientId}";
-        CreateText(row, "Name", playerName, 14,
+        string playerName = isLocal ? "YOU" : $"PLAYER {data.ClientId}";
+        CreateText(row, "Name", playerName, 17,
             nameColor, FontStyles.Bold,
-            new Vector2(-120, 0), new Vector2(160, 32), TextAlignmentOptions.Left);
+            new Vector2(-402, 0), new Vector2(420, 58), TextAlignmentOptions.Left);
 
         // Kills
-        CreateText(row, "Kills", data.Kills.ToString(), 15,
+        CreateText(row, "Kills", data.Kills.ToString(), 18,
             TextPrimary, FontStyles.Bold,
-            new Vector2(100, 0), new Vector2(60, 32), TextAlignmentOptions.Center);
+            new Vector2(220, 0), new Vector2(80, 58), TextAlignmentOptions.Center);
 
         // Deaths
-        CreateText(row, "Deaths", data.Deaths.ToString(), 15,
-            TextPrimary, FontStyles.Normal,
-            new Vector2(170, 0), new Vector2(60, 32), TextAlignmentOptions.Center);
+        CreateText(row, "Deaths", data.Deaths.ToString(), 18,
+            TextSecondary, FontStyles.Normal,
+            new Vector2(342, 0), new Vector2(80, 58), TextAlignmentOptions.Center);
 
         // K/D
         float kd = data.Deaths > 0 ? (float)data.Kills / data.Deaths : data.Kills;
         Color kdColor = kd >= 1f ? AccentGreenText : AccentRed;
-        CreateText(row, "KD", kd.ToString("F1"), 14,
+        CreateText(row, "KD", kd.ToString("F2"), 17,
             kdColor, FontStyles.Bold,
-            new Vector2(220, 0), new Vector2(50, 32), TextAlignmentOptions.Center);
+            new Vector2(468, 0), new Vector2(90, 58), TextAlignmentOptions.Center);
     }
 
     void OnPlayAgain()
@@ -1212,7 +1364,7 @@ public class ScoreboardUI : MonoBehaviour
 
     string GetPickupPromptText(Pickup pickup)
     {
-        return $"PICK UP {GetPickupName(pickup)}";
+        return $"E    Pick up {GetPickupName(pickup)}";
     }
 
     string GetPickupFeedbackText(Pickup pickup)
@@ -1330,10 +1482,152 @@ public class ScoreboardUI : MonoBehaviour
         {
             m_HudBar.SetActive(visible);
         }
+
+        if (m_CrosshairText != null)
+        {
+            m_CrosshairText.gameObject.SetActive(visible);
+        }
+    }
+
+    void SyncToolkitUI()
+    {
+        if (m_Toolkit == null || !m_Toolkit.IsReady)
+            return;
+
+        float healthRatio = m_LocalHealth != null ? Mathf.Clamp01(m_LocalHealth.GetRatio()) : 0f;
+        WeaponController activeWeapon = m_LocalWeapons != null ? m_LocalWeapons.GetActiveWeapon() : null;
+        m_Toolkit.SetHud(
+            m_TimerText != null ? m_TimerText.text : "00:00",
+            m_KillsText != null ? m_KillsText.text : "0",
+            m_DeathsText != null ? m_DeathsText.text : "0",
+            m_HealthText != null ? m_HealthText.text : "0",
+            healthRatio,
+            m_WeaponText != null ? m_WeaponText.text : "UNARMED",
+            activeWeapon != null ? activeWeapon.GetCurrentAmmo() : 0,
+            activeWeapon != null ? activeWeapon.MaxAmmo : 0,
+            m_GameFlowManager != null ? m_GameFlowManager.ScoreLimit : 1,
+            m_HudBar != null && m_HudBar.activeSelf);
+
+        bool damageVisible = m_DamageVignetteGroup != null && m_DamageVignetteGroup.alpha > 0.01f;
+        m_Toolkit.SetFeedback(
+            m_CrosshairText != null && m_CrosshairText.gameObject.activeSelf,
+            m_HitMarkerText != null && m_HitMarkerText.gameObject.activeSelf,
+            m_HitMarkerText != null ? m_HitMarkerText.text : "×",
+            m_KillConfirmText != null && m_KillConfirmText.gameObject.activeSelf,
+            m_KillConfirmText != null ? m_KillConfirmText.text : "ELIMINATED",
+            m_ProtectionText != null && m_ProtectionText.gameObject.activeSelf,
+            m_ProtectionText != null ? m_ProtectionText.text : "PROTECTED",
+            m_PickupPromptText != null && m_PickupPromptText.gameObject.activeSelf,
+            m_PickupPromptText != null ? m_PickupPromptText.text : "Pick up item",
+            m_PickupFeedbackText != null && m_PickupFeedbackText.gameObject.activeSelf,
+            m_PickupFeedbackText != null ? m_PickupFeedbackText.text : "ITEM ACQUIRED",
+            m_LowHealthText != null && m_LowHealthText.gameObject.activeSelf,
+            damageVisible);
+
+        bool countdownVisible = m_CountdownPanel != null && m_CountdownPanel.activeSelf;
+        bool deathVisible = m_DeathPanel != null && m_DeathPanel.activeSelf;
+        bool scoreboardVisible = m_ScoreboardPanel != null && m_ScoreboardPanel.activeSelf;
+        bool resultsVisible = m_MatchEndPanel != null && m_MatchEndPanel.activeSelf;
+        bool pauseVisible = m_PausePanel != null && m_PausePanel.activeSelf;
+        bool helpVisible = m_HelpPanel != null && m_HelpPanel.activeSelf;
+        m_Toolkit.SetOverlays(
+            countdownVisible,
+            deathVisible,
+            scoreboardVisible,
+            resultsVisible,
+            pauseVisible,
+            helpVisible);
+
+        if (countdownVisible)
+        {
+            m_Toolkit.SetCountdown(
+                m_CountdownLabelText != null ? m_CountdownLabelText.text : "GET READY",
+                m_CountdownText != null ? m_CountdownText.text : "3");
+        }
+
+        if (deathVisible)
+        {
+            m_Toolkit.SetDeath(
+                m_DeathTitleText != null ? m_DeathTitleText.text : "ELIMINATED",
+                m_DeathSubtitleText != null ? m_DeathSubtitleText.text : string.Empty,
+                m_DeathTimerText != null ? m_DeathTimerText.text : "0.0");
+        }
+
+        if (scoreboardVisible)
+        {
+            List<VanguardScoreRowData> rows = BuildToolkitScoreRows();
+            m_Toolkit.SetScoreboard(
+                m_ScoreboardTimerText != null ? m_ScoreboardTimerText.text : "DEATHMATCH",
+                rows);
+        }
+
+        if (resultsVisible)
+        {
+            List<VanguardScoreRowData> rows = BuildToolkitScoreRows();
+            m_Toolkit.SetResults(
+                m_EndTitle != null ? m_EndTitle.text : "MATCH COMPLETE",
+                m_EndSubtitle != null ? m_EndSubtitle.text : string.Empty,
+                m_EndWinnerText != null ? m_EndWinnerText.text : string.Empty,
+                m_EndPlacementText != null ? m_EndPlacementText.text : string.Empty,
+                rows,
+                m_PlayAgainButton != null && m_PlayAgainButton.interactable,
+                m_PlayAgainButtonLabel != null ? m_PlayAgainButtonLabel.text : "WAITING FOR HOST");
+        }
+
+        if (m_LastToolkitKillFeedCount != m_KillFeedRows.Count)
+        {
+            m_LastToolkitKillFeedCount = m_KillFeedRows.Count;
+            m_ToolkitKillFeed.Clear();
+            for (int i = 0; i < m_KillFeedRows.Count; i++)
+            {
+                GameObject row = m_KillFeedRows[i];
+                if (row == null)
+                    continue;
+
+                TextMeshProUGUI label = row.GetComponentInChildren<TextMeshProUGUI>();
+                if (label != null)
+                {
+                    m_ToolkitKillFeed.Add(label.text);
+                }
+            }
+
+            m_Toolkit.SetKillFeed(m_ToolkitKillFeed);
+        }
+
+        m_Toolkit.SetSettings(
+            m_SensitivityValueText != null ? m_SensitivityValueText.text : "1.0",
+            m_MasterVolumeValueText != null ? m_MasterVolumeValueText.text : "100%");
+    }
+
+    List<VanguardScoreRowData> BuildToolkitScoreRows()
+    {
+        List<VanguardScoreRowData> rows = new List<VanguardScoreRowData>();
+        if (m_GameFlowManager == null || NetworkManager.Singleton == null)
+            return rows;
+
+        List<PlayerScoreData> players = GetSortedPlayers();
+        ulong localId = NetworkManager.Singleton.LocalClientId;
+        for (int i = 0; i < players.Count; i++)
+        {
+            PlayerScoreData player = players[i];
+            bool isLocal = player.ClientId == localId;
+            rows.Add(new VanguardScoreRowData(
+                i + 1,
+                isLocal ? "YOU" : GetDisplayName(player.ClientId).ToUpperInvariant(),
+                player.Kills,
+                player.Deaths,
+                isLocal));
+        }
+
+        return rows;
     }
 
     void OnBackToMenu()
     {
+        if (m_IsReturningToMenu)
+            return;
+
+        m_IsReturningToMenu = true;
         SetHelpOverlayVisible(false);
         SetPauseOverlayVisible(false);
         HideDeathOverlay();
@@ -1347,16 +1641,8 @@ public class ScoreboardUI : MonoBehaviour
 
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
-
-        if (NetworkManager.Singleton != null)
-        {
-            if (NetworkManager.Singleton.IsListening)
-            {
-                NetworkManager.Singleton.Shutdown();
-            }
-        }
-
-        UnityEngine.SceneManagement.SceneManager.LoadScene("IntroMenu");
+        PlayerInputHandler.SetMenuInputBlocked(true);
+        NetworkSessionExit.ReturnToMenu();
     }
 
     // ===== UI FACTORY METHODS =====
@@ -1442,12 +1728,27 @@ public class ScoreboardUI : MonoBehaviour
         colors.highlightedColor = new Color(1, 1, 1, 0.85f);
         colors.pressedColor = new Color(0.7f, 0.7f, 0.7f, 1f);
         btn.colors = colors;
+        obj.AddComponent<MenuButtonAnimator>();
 
         CreateText(obj, "Label", label, 13,
             textColor, FontStyles.Bold, Vector2.zero, size);
 
         return btn;
     }
+
+    void AddOutline(GameObject obj, Color color)
+    {
+        Outline outline = obj.AddComponent<Outline>();
+        outline.effectColor = color;
+        outline.effectDistance = new Vector2(1f, 1f);
+    }
+
+    internal void ToolkitResume() => SetPauseOverlayVisible(false);
+    internal void ToolkitLeaveMatch() => OnBackToMenu();
+    internal void ToolkitPlayAgain() => OnPlayAgain();
+    internal void ToolkitAdjustSensitivity(float delta) => AdjustLookSensitivity(delta);
+    internal void ToolkitAdjustVolume(float delta) => AdjustMasterVolume(delta);
+    internal void ToolkitToggleFullscreen() => ToggleFullscreen();
 
     struct PlayerScoreData
     {
