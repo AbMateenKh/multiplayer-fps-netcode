@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Unity.FPS.Game;
 using Unity.FPS.Gameplay;
+using Unity.FPS.Editor;
 using UnityEditor;
 using UnityEditor.Animations;
 using UnityEngine;
@@ -18,7 +19,6 @@ public static class AstronautCharacterBuilder
     const string ControllerPath = GeneratedRoot + "/Astronaut.controller";
     const string ArmsMeshPath = GeneratedRoot + "/AstronautArms.asset";
     const string ViewModelPath = GeneratedRoot + "/AstronautViewModel.prefab";
-    const string PlayerPrefabPath = "Assets/Multiplayer/Prefabs/Player.prefab";
     const string BlasterPrefabPath = "Assets/FPS/Prefabs/Weapons/Weapon_Blaster.prefab";
 
     static readonly string[] CharacterPaths =
@@ -51,7 +51,7 @@ public static class AstronautCharacterBuilder
         AssetDatabase.DeleteAsset(ControllerPath);
         GameObject viewModel =
             BuildViewModel(suitMaterial, gloveMaterial, accentMaterial);
-        ConfigurePlayerPrefab(material, null);
+        AstronautPlayerPrefabAuthoring.AuthorPlayerPrefab();
         ConfigureBlasterPrefab(viewModel);
 
         AssetDatabase.SaveAssets();
@@ -297,34 +297,6 @@ public static class AstronautCharacterBuilder
     {
         renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         renderer.receiveShadows = false;
-    }
-
-    static void ConfigurePlayerPrefab(Material material, RuntimeAnimatorController controller)
-    {
-        GameObject root = PrefabUtility.LoadPrefabContents(PlayerPrefabPath);
-        try
-        {
-            AstronautPlayerVisual visual = root.GetComponent<AstronautPlayerVisual>();
-            if (visual == null)
-            {
-                visual = root.AddComponent<AstronautPlayerVisual>();
-            }
-
-            visual.CharacterModels = CharacterPaths
-                .Select(AssetDatabase.LoadAssetAtPath<GameObject>)
-                .ToArray();
-            visual.AnimationController = controller;
-            visual.CharacterMaterial = material;
-            visual.ModelScale = 0.62f;
-            visual.ModelOffset = Vector3.zero;
-            visual.ModelYaw = 180f;
-            EditorUtility.SetDirty(visual);
-            PrefabUtility.SaveAsPrefabAsset(root, PlayerPrefabPath);
-        }
-        finally
-        {
-            PrefabUtility.UnloadPrefabContents(root);
-        }
     }
 
     static void ConfigureBlasterPrefab(GameObject viewModelPrefab)

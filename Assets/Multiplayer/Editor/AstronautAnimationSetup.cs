@@ -15,7 +15,6 @@ namespace Unity.FPS.Editor
         const string k_SourceModel = k_CharacterFolder + "/Astronaut_FinnTheFrog.fbx";
         const string k_OutputFolder = "Assets/Multiplayer/Art/Characters/Animation";
         const string k_ControllerPath = k_OutputFolder + "/AstronautThirdPerson.controller";
-        const string k_PlayerPrefabPath = "Assets/Multiplayer/Prefabs/Player.prefab";
 
         static readonly string[] k_AstronautModels =
         {
@@ -59,7 +58,7 @@ namespace Unity.FPS.Editor
                 ValidateRequiredClips(clips);
 
                 AnimatorController controller = BuildController(clips);
-                AssignControllerToPlayerPrefab(controller);
+                AstronautPlayerPrefabAuthoring.AuthorPlayerPrefab();
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();
 
@@ -298,27 +297,5 @@ namespace Unity.FPS.Editor
             transition.interruptionSource = TransitionInterruptionSource.SourceThenDestination;
         }
 
-        static void AssignControllerToPlayerPrefab(RuntimeAnimatorController controller)
-        {
-            GameObject prefabRoot = PrefabUtility.LoadPrefabContents(k_PlayerPrefabPath);
-            try
-            {
-                AstronautPlayerVisual visual =
-                    prefabRoot.GetComponent<AstronautPlayerVisual>();
-                if (visual == null)
-                {
-                    throw new InvalidOperationException(
-                        $"{k_PlayerPrefabPath} has no {nameof(AstronautPlayerVisual)} component.");
-                }
-
-                visual.AnimationController = controller;
-                EditorUtility.SetDirty(visual);
-                PrefabUtility.SaveAsPrefabAsset(prefabRoot, k_PlayerPrefabPath);
-            }
-            finally
-            {
-                PrefabUtility.UnloadPrefabContents(prefabRoot);
-            }
-        }
     }
 }

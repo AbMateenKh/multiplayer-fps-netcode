@@ -16,12 +16,10 @@ namespace Unity.FPS.Gameplay
         static readonly int ShootHash = Animator.StringToHash("Shoot");
         static readonly int HitHash = Animator.StringToHash("Hit");
 
-        public GameObject[] CharacterModels;
-        public RuntimeAnimatorController AnimationController;
-        public Material CharacterMaterial;
-        public float ModelScale = 0.62f;
-        public Vector3 ModelOffset = Vector3.zero;
-        public float ModelYaw = 180f;
+        [Header("Authored Player Prefab References")]
+        public GameObject CharacterRoot;
+        public Animator CharacterAnimator;
+        public Transform AimTorso;
 
         readonly NetworkVariable<float> m_MoveSpeed = new(
             0f,
@@ -52,11 +50,6 @@ namespace Unity.FPS.Gameplay
         Transform m_AimTorso;
         float m_NextStateSendTime;
         float m_VisualAimPitch;
-        float m_MovementCycle;
-        float m_Recoil;
-        float m_HitPulse;
-        float m_DeathBlend;
-        bool m_IsDead;
 
         public override void OnNetworkSpawn()
         {
@@ -65,7 +58,7 @@ namespace Unity.FPS.Gameplay
             m_Health = GetComponent<Health>();
 
             DisablePrototypeRenderers();
-            CreateCharacterVisual();
+            BindAuthoredCharacterVisual();
 
             m_ShotSequence.OnValueChanged += OnShotSequenceChanged;
             if (m_Health != null)
@@ -135,10 +128,6 @@ namespace Unity.FPS.Gameplay
                 m_Animator.SetFloat(SpeedHash, m_MoveSpeed.Value, 0.1f, Time.deltaTime);
                 m_Animator.SetBool(GroundedHash, m_Grounded.Value);
             }
-            else
-            {
-                AnimateProceduralVisual();
-            }
         }
 
         void LateUpdate()
@@ -159,114 +148,36 @@ namespace Unity.FPS.Gameplay
                 Vector3.right);
         }
 
-        void CreateCharacterVisual()
+        void BindAuthoredCharacterVisual()
         {
-            if (CharacterModels == null || CharacterModels.Length == 0)
-                return;
+            m_VisualInstance = CharacterRoot;
+            m_Animator = CharacterAnimator;
+            m_AimTorso = AimTorso;
 
-            int variantIndex = (int)(OwnerClientId % (ulong)CharacterModels.Length);
-            GameObject model = CharacterModels[variantIndex];
-            if (model == null)
-                return;
-
-            m_VisualInstance = Instantiate(model, transform);
-            m_VisualInstance.name = $"AstronautVisual_{variantIndex + 1}";
-            m_VisualInstance.transform.SetLocalPositionAndRotation(
-                ModelOffset,
-                Quaternion.Euler(0f, ModelYaw, 0f));
-            m_VisualInstance.transform.localScale = Vector3.one * ModelScale;
-            m_AimTorso = FindDescendant(m_VisualInstance.transform, "Torso");
-
-            m_Animator = m_VisualInstance.GetComponentInChildren<Animator>(true);
-            if (m_Animator == null)
+            if (m_VisualInstance == null || m_Animator == null)
             {
-                m_Animator = m_VisualInstance.AddComponent<Animator>();
-            }
-
-            if (m_Animator != null && AnimationController != null)
-            {
-                m_Animator.enabled = true;
-                m_Animator.runtimeAnimatorController = AnimationController;
-                m_Animator.applyRootMotion = false;
-                m_Animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
-                m_Animator.Rebind();
-                m_Animator.Update(0f);
-                m_Animator.SetBool(GroundedHash, true);
-            }
-            else
-            {
-                if (m_Animator != null)
-                {
-                    m_Animator.enabled = false;
-                }
-
+                Debug.LogError(
+                    "[Astronaut Visual] Player.prefab is missing its authored character references.",
+                    this);
                 m_Animator = null;
+                return;
             }
+
+            m_Animator.enabled = true;
+            m_Animator.applyRootMotion = false;
+            m_Animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+            m_Animator.Rebind();
+            m_Animator.SetFloat(SpeedHash, 0f);
+            m_Animator.SetBool(GroundedHash, true);
+            m_Animator.Update(0f);
 
             foreach (Renderer renderer in m_VisualInstance.GetComponentsInChildren<Renderer>(true))
             {
-                if (CharacterMaterial != null)
-                {
-                    Material[] materials = renderer.sharedMaterials;
-                    for (int i = 0; i < materials.Length; i++)
-                    {
-                        materials[i] = CharacterMaterial;
-                    }
-
-                    renderer.sharedMaterials = materials;
-                }
-
                 if (IsOwner)
                 {
                     renderer.shadowCastingMode = ShadowCastingMode.ShadowsOnly;
                 }
             }
-        }
-
-        static Transform FindDescendant(Transform root, string targetName)
-        {
-            foreach (Transform child in root)
-            {
-                if (child.name == targetName)
-                    return child;
-
-                Transform match = FindDescendant(child, targetName);
-                if (match != null)
-                    return match;
-            }
-
-            return null;
-        }
-
-        void AnimateProceduralVisual()
-        {
-            if (m_VisualInstance == null)
-                return;
-
-            float deltaTime = Time.deltaTime;
-            float speed01 = Mathf.Clamp01(m_MoveSpeed.Value / 5.5f);
-            m_MovementCycle += deltaTime * Mathf.Lerp(2f, 10f, speed01);
-            m_Recoil = Mathf.MoveTowards(m_Recoil, 0f, deltaTime * 7f);
-            m_HitPulse = Mathf.MoveTowards(m_HitPulse, 0f, deltaTime * 4f);
-            m_DeathBlend = Mathf.MoveTowards(
-                m_DeathBlend,
-                m_IsDead ? 1f : 0f,
-                deltaTime * 2.5f);
-
-            float groundedBob = m_Grounded.Value
-                ? Mathf.Sin(m_MovementCycle * 2f) * 0.035f * speed01
-                : 0.035f;
-            float strideRoll = Mathf.Sin(m_MovementCycle) * 2.4f * speed01;
-            float hitRoll = Mathf.Sin(Time.time * 32f) * 7f * m_HitPulse;
-
-            m_VisualInstance.transform.localPosition =
-                ModelOffset +
-                Vector3.up * (groundedBob - 0.62f * m_DeathBlend) +
-                Vector3.back * (0.05f * m_Recoil);
-            m_VisualInstance.transform.localRotation = Quaternion.Euler(
-                -8f * m_Recoil,
-                ModelYaw,
-                strideRoll + hitRoll + 88f * m_DeathBlend);
         }
 
         void DisablePrototypeRenderers()
@@ -337,10 +248,6 @@ namespace Unity.FPS.Gameplay
             {
                 m_Animator.SetTrigger(ShootHash);
             }
-            else
-            {
-                m_Recoil = 1f;
-            }
         }
 
         void OnHealthChanged(float previous, float current)
@@ -350,15 +257,10 @@ namespace Unity.FPS.Gameplay
             {
                 m_Animator.SetTrigger(HitHash);
             }
-            else if (current > 0f && current < previous)
-            {
-                m_HitPulse = 1f;
-            }
         }
 
         void SetDead(bool dead)
         {
-            m_IsDead = dead;
             if (m_Animator != null)
             {
                 m_Animator.SetBool(DeadHash, dead);
