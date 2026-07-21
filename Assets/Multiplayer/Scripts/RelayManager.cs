@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
+using Unity.Services.Multiplayer;
 using Unity.Services.Relay;
 using Unity.Services.Relay.Models;
 using UnityEngine;
@@ -11,11 +12,7 @@ public class RelayManager : MonoBehaviour
     public static RelayManager Instance { get; private set; }
     public string LastErrorMessage { get; private set; }
 
-#if UNITY_WEBGL && !UNITY_EDITOR
-    const string k_RelayConnectionType = "wss";
-#else
-    const string k_RelayConnectionType = "dtls";
-#endif
+    const RelayProtocol k_RelayProtocol = RelayProtocol.Default;
 
     void Awake()
     {
@@ -48,8 +45,8 @@ public class RelayManager : MonoBehaviour
 
             // Configure transport
             UnityTransport transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
-            transport.UseWebSockets = k_RelayConnectionType == "wss";
-            transport.SetRelayServerData(allocation.ToRelayServerData(k_RelayConnectionType));
+            transport.UseWebSockets = k_RelayProtocol == RelayProtocol.WSS;
+            transport.SetRelayServerData(allocation.ToRelayServerData(k_RelayProtocol));
 
             if (!NetworkManager.Singleton.IsListening)
             {
@@ -80,8 +77,8 @@ public class RelayManager : MonoBehaviour
 
             // Configure transport
             UnityTransport transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
-            transport.UseWebSockets = k_RelayConnectionType == "wss";
-            transport.SetRelayServerData(joinAllocation.ToRelayServerData(k_RelayConnectionType));
+            transport.UseWebSockets = k_RelayProtocol == RelayProtocol.WSS;
+            transport.SetRelayServerData(joinAllocation.ToRelayServerData(k_RelayProtocol));
 
             if (!NetworkManager.Singleton.IsListening)
             {
