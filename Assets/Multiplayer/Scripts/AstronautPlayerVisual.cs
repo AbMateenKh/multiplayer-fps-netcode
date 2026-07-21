@@ -33,6 +33,11 @@ namespace Unity.FPS.Gameplay
             NetworkVariableReadPermission.Everyone,
             NetworkVariableWritePermission.Owner);
 
+        readonly NetworkVariable<float> m_AimPitch = new(
+            0f,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Owner);
+
         readonly NetworkVariable<ushort> m_ShotSequence = new(
             0,
             NetworkVariableReadPermission.Everyone,
@@ -44,7 +49,9 @@ namespace Unity.FPS.Gameplay
         Health m_Health;
         Animator m_Animator;
         GameObject m_VisualInstance;
+        Transform m_AimTorso;
         float m_NextStateSendTime;
+        float m_VisualAimPitch;
         float m_MovementCycle;
         float m_Recoil;
         float m_HitPulse;
@@ -106,6 +113,16 @@ namespace Unity.FPS.Gameplay
                     Vector3 velocity = m_Character.CharacterVelocity;
                     horizontalSpeed = new Vector2(velocity.x, velocity.z).magnitude;
                     grounded = m_Character.IsGrounded;
+
+                    if (m_Character.PlayerCamera != null)
+                    {
+                        m_AimPitch.Value = Mathf.Clamp(
+                            Mathf.DeltaAngle(
+                                0f,
+                                m_Character.PlayerCamera.transform.localEulerAngles.x),
+                            -75f,
+                            75f);
+                    }
                 }
 
                 m_MoveSpeed.Value = horizontalSpeed;
@@ -124,6 +141,24 @@ namespace Unity.FPS.Gameplay
             }
         }
 
+        void LateUpdate()
+        {
+            if (m_Animator == null || m_AimTorso == null)
+                return;
+
+            float aimSharpness = 1f - Mathf.Exp(-14f * Time.deltaTime);
+            m_VisualAimPitch = Mathf.LerpAngle(
+                m_VisualAimPitch,
+                m_AimPitch.Value,
+                aimSharpness);
+
+            // The Animator writes the locomotion pose in Update. Layer a restrained
+            // upper-body pitch afterwards so remote aim remains readable.
+            m_AimTorso.localRotation *= Quaternion.AngleAxis(
+                m_VisualAimPitch * 0.55f,
+                Vector3.right);
+        }
+
         void CreateCharacterVisual()
         {
             if (CharacterModels == null || CharacterModels.Length == 0)
@@ -140,10 +175,17 @@ namespace Unity.FPS.Gameplay
                 ModelOffset,
                 Quaternion.Euler(0f, ModelYaw, 0f));
             m_VisualInstance.transform.localScale = Vector3.one * ModelScale;
+            m_AimTorso = FindDescendant(m_VisualInstance.transform, "Torso");
 
             m_Animator = m_VisualInstance.GetComponentInChildren<Animator>(true);
+            if (m_Animator == null)
+            {
+                m_Animator = m_VisualInstance.AddComponent<Animator>();
+            }
+
             if (m_Animator != null && AnimationController != null)
             {
+                m_Animator.enabled = true;
                 m_Animator.runtimeAnimatorController = AnimationController;
                 m_Animator.applyRootMotion = false;
                 m_Animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
@@ -179,6 +221,21 @@ namespace Unity.FPS.Gameplay
                     renderer.shadowCastingMode = ShadowCastingMode.ShadowsOnly;
                 }
             }
+        }
+
+        static Transform FindDescendant(Transform root, string targetName)
+        {
+            foreach (Transform child in root)
+            {
+                if (child.name == targetName)
+                    return child;
+
+                Transform match = FindDescendant(child, targetName);
+                if (match != null)
+                    return match;
+            }
+
+            return null;
         }
 
         void AnimateProceduralVisual()
