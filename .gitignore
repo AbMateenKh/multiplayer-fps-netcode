@@ -35,6 +35,7 @@ ExportedObj/
 *.csproj
 *.unityproj
 *.sln
+*.slnx
 *.suo
 *.tmp
 *.user
@@ -63,6 +64,30 @@ sysinfo.txt
 
 # Crashlytics generated file
 crashlytics-build.properties
+
+# Local Unity recovery and editor-generated project state
+/Assets/_Recovery/
+/Assets/_Recovery.meta
+/Assets/UserChoices.choices
+/Assets/UserChoices.choices.meta
+/ProjectSettings/VirtualProjectsConfig.json
+/ProfilerCaptures/
+/tmp/
+/_vault_staging/
+
+# Local test recordings
+/Recording*.mp4
+
+# Third-party evaluation packages. These are not yet integrated and their
+# source files are intentionally not redistributed through this repository.
+/Assets/BSS/
+/Assets/BSS.meta
+/Assets/Kinemation/
+/Assets/Kinemation.meta
+/Assets/Art/Toon Shooter Game Kit - Dec 2022/
+/Assets/Art/Toon Shooter Game Kit - Dec 2022.meta
+/Assets/Art/Universal Base Characters\[Standard\]/
+/Assets/Art/Universal Base Characters\[Standard\].meta
 
 # Packed Addressables
 /[Aa]ssets/[Aa]ddressable[Aa]ssets[Dd]ata/*/*.bin*

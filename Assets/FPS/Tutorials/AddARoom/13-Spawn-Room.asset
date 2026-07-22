@@ -72,8 +72,7 @@ MonoBehaviour:
                   m_TypeName: 
                 m_ComponentIndex: 0
                 m_AssetObject: {fileID: 0}
-                m_Prefab: {fileID: 7389833897528589514, guid: 115dbd335d944e049a14c0345b664cf6,
-                  type: 3}
+                m_Prefab: {fileID: 7389833897528589514, guid: 115dbd335d944e049a14c0345b664cf6, type: 3}
               m_FutureObjectReference: {fileID: 0}
             m_VisualElementClassName: 
             m_VisualElementName: 
@@ -242,15 +241,12 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   isTesting: 0
-  m_PrefabParent: {fileID: 7389833897528589514, guid: 115dbd335d944e049a14c0345b664cf6,
-    type: 3}
+  m_PrefabParent: {fileID: 7389833897528589514, guid: 115dbd335d944e049a14c0345b664cf6, type: 3}
   m_FuturePrefabInstances:
     m_Items:
-    - m_PrefabParent: {fileID: 7389833897528589514, guid: 115dbd335d944e049a14c0345b664cf6,
-        type: 3}
+    - m_PrefabParent: {fileID: 7389833897528589514, guid: 115dbd335d944e049a14c0345b664cf6, type: 3}
       m_FutureReference: {fileID: 114597643096406878}
-    - m_PrefabParent: {fileID: 7389833897528589513, guid: 115dbd335d944e049a14c0345b664cf6,
-        type: 3}
+    - m_PrefabParent: {fileID: 7389833897528589513, guid: 115dbd335d944e049a14c0345b664cf6, type: 3}
       m_FutureReference: {fileID: 114635365627350066}
 --- !u!114 &114597643096406878
 MonoBehaviour:
