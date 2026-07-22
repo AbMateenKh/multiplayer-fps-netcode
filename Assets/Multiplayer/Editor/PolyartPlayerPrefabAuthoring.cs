@@ -14,6 +14,8 @@ namespace Unity.FPS.Editor
         const string CharacterPrefabPath =
             "Assets/SciFiWarriorPBRHPPolyart/Prefabs/PolyartCharacter.prefab";
         const string CharacterRootName = "CharacterVisual";
+        static readonly Vector3 CharacterLocalPosition = new(0f, 0.35f, 0f);
+        static readonly Vector3 CharacterLocalScale = Vector3.one * 0.75f;
 
         [MenuItem("Tools/Portfolio/Characters/Author Polyart Network Player Prefab")]
         public static void AuthorPlayerPrefab()
@@ -34,8 +36,10 @@ namespace Unity.FPS.Editor
                     characterPrefab,
                     root.transform);
                 character.name = CharacterRootName;
-                character.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
-                character.transform.localScale = Vector3.one;
+                character.transform.SetLocalPositionAndRotation(
+                    CharacterLocalPosition,
+                    Quaternion.identity);
+                character.transform.localScale = CharacterLocalScale;
 
                 Animator animator = character.GetComponent<Animator>();
                 if (animator == null || animator.avatar == null || !animator.avatar.isHuman)
