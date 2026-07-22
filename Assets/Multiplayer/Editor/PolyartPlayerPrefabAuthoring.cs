@@ -28,6 +28,7 @@ namespace Unity.FPS.Editor
             try
             {
                 RemoveExistingPresentation(root);
+                CleanLegacyPresentationObjects(root);
 
                 GameObject character = (GameObject)PrefabUtility.InstantiatePrefab(
                     characterPrefab,
@@ -71,6 +72,26 @@ namespace Unity.FPS.Editor
                 "rifle, Humanoid Animator, controller, and network presentation references.");
         }
 
+        [MenuItem("Tools/Portfolio/Characters/Clean Player Prefab Hierarchy")]
+        public static void CleanPlayerPrefabHierarchy()
+        {
+            GameObject root = PrefabUtility.LoadPrefabContents(PlayerPrefabPath);
+            try
+            {
+                CleanLegacyPresentationObjects(root);
+                PrefabUtility.SaveAsPrefabAsset(root, PlayerPrefabPath);
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(root);
+            }
+
+            AssetDatabase.SaveAssets();
+            Debug.Log(
+                "[Polyart Authoring] Removed obsolete debug presentation objects " +
+                "and normalized the retained jetpack VFX hierarchy.");
+        }
+
         static void RemoveExistingPresentation(GameObject root)
         {
             Transform existingCharacter = root.transform.Find(CharacterRootName);
@@ -89,6 +110,38 @@ namespace Unity.FPS.Editor
             if (existing != null)
             {
                 UnityEngine.Object.DestroyImmediate(existing);
+            }
+        }
+
+        static void CleanLegacyPresentationObjects(GameObject root)
+        {
+            DestroyChild(root.transform, "Main Camera/Capsule (1)");
+            DestroyChild(root.transform, "ShadowProjector");
+
+            Transform jetpackVfx = root.transform.Find("Capsule");
+            if (jetpackVfx == null)
+                return;
+
+            jetpackVfx.name = "JetpackVFX";
+            RenameChild(jetpackVfx, "VFX_JetpackTrail_left", "JetpackTrailLeft");
+            RenameChild(jetpackVfx, "VFX_JetpackTrail_right", "JetpackTrailRight");
+        }
+
+        static void DestroyChild(Transform root, string path)
+        {
+            Transform child = root.Find(path);
+            if (child != null)
+            {
+                UnityEngine.Object.DestroyImmediate(child.gameObject);
+            }
+        }
+
+        static void RenameChild(Transform root, string currentName, string newName)
+        {
+            Transform child = root.Find(currentName);
+            if (child != null)
+            {
+                child.name = newName;
             }
         }
 

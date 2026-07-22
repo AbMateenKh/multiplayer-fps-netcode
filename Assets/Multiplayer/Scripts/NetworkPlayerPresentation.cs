@@ -79,7 +79,6 @@ namespace Unity.FPS.Gameplay
             m_Weapons = GetComponent<PlayerWeaponsManager>();
             m_Health = GetComponent<Health>();
 
-            DisablePrototypeRenderers();
             BindAuthoredPresentation();
 
             m_ShotSequence.OnValueChanged += OnShotSequenceChanged;
@@ -267,17 +266,6 @@ namespace Unity.FPS.Gameplay
                      m_Weapons.WeaponParentSocket.GetComponentsInChildren<Renderer>(true))
             {
                 renderer.enabled = false;
-            }
-        }
-
-        void DisablePrototypeRenderers()
-        {
-            foreach (Renderer renderer in GetComponentsInChildren<Renderer>(true))
-            {
-                if (renderer.gameObject.name.StartsWith("Capsule"))
-                {
-                    renderer.enabled = false;
-                }
             }
         }
 
