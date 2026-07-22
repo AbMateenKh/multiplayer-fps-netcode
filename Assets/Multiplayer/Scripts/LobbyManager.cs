@@ -145,7 +145,9 @@ public class LobbyManager : MonoBehaviour
             bool joinedRelay = await RelayManager.Instance.JoinRelay(relayJoinCode);
             if (!joinedRelay)
             {
-                LastErrorMessage = RelayManager.Instance.LastErrorMessage;
+                string relayError = RelayManager.Instance.LastErrorMessage;
+                await LeaveLobby();
+                LastErrorMessage = relayError;
             }
 
             return joinedRelay;
@@ -175,7 +177,9 @@ public class LobbyManager : MonoBehaviour
             bool joinedRelay = await RelayManager.Instance.JoinRelay(relayJoinCode);
             if (!joinedRelay)
             {
-                LastErrorMessage = RelayManager.Instance.LastErrorMessage;
+                string relayError = RelayManager.Instance.LastErrorMessage;
+                await LeaveLobby();
+                LastErrorMessage = relayError;
             }
 
             return joinedRelay;

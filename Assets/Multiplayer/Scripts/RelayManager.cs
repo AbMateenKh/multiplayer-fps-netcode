@@ -13,6 +13,7 @@ public class RelayManager : MonoBehaviour
     public string LastErrorMessage { get; private set; }
 
     const RelayProtocol k_RelayProtocol = RelayProtocol.Default;
+    const int k_ConnectionTimeoutMilliseconds = 15000;
 
     void Awake()
     {
@@ -75,17 +76,83 @@ public class RelayManager : MonoBehaviour
 
             JoinAllocation joinAllocation = await RelayService.Instance.JoinAllocationAsync(joinCode);
 
-            // Configure transport
-            UnityTransport transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
+            NetworkManager networkManager = NetworkManager.Singleton;
+            if (networkManager == null)
+            {
+                LastErrorMessage = "Network bootstrap is missing.";
+                return false;
+            }
+
+            UnityTransport transport = networkManager.GetComponent<UnityTransport>();
+            if (transport == null)
+            {
+                LastErrorMessage = "Unity Transport is missing from the network bootstrap.";
+                return false;
+            }
+
+            if (networkManager.IsListening || networkManager.ShutdownInProgress)
+            {
+                LastErrorMessage = "A network session is already running.";
+                return false;
+            }
+
             transport.UseWebSockets = k_RelayProtocol == RelayProtocol.WSS;
             transport.SetRelayServerData(joinAllocation.ToRelayServerData(k_RelayProtocol));
 
-            if (!NetworkManager.Singleton.IsListening)
+            var connectionResult = new TaskCompletionSource<bool>();
+
+            void OnConnected(ulong clientId)
             {
-                NetworkManager.Singleton.StartClient();
+                if (clientId == networkManager.LocalClientId)
+                {
+                    connectionResult.TrySetResult(true);
+                }
             }
 
-            return true;
+            void OnDisconnected(ulong clientId)
+            {
+                connectionResult.TrySetResult(false);
+            }
+
+            networkManager.OnClientConnectedCallback += OnConnected;
+            networkManager.OnClientDisconnectCallback += OnDisconnected;
+
+            try
+            {
+                if (!networkManager.StartClient())
+                {
+                    LastErrorMessage = "Could not start the multiplayer client.";
+                    return false;
+                }
+
+                Task completed = await Task.WhenAny(
+                    connectionResult.Task,
+                    Task.Delay(k_ConnectionTimeoutMilliseconds));
+
+                if (completed != connectionResult.Task || !connectionResult.Task.Result)
+                {
+                    string disconnectReason = networkManager.DisconnectReason;
+                    LastErrorMessage = string.IsNullOrWhiteSpace(disconnectReason)
+                        ? "The host rejected the connection. Restart both game instances so they use the same project version."
+                        : disconnectReason;
+
+                    if (networkManager.IsListening || networkManager.ShutdownInProgress)
+                    {
+                        networkManager.Shutdown();
+                    }
+
+                    Debug.LogWarning($"[Relay] Client connection was not approved: {LastErrorMessage}");
+                    return false;
+                }
+
+                Debug.Log("[Relay] Client connection approved by host.");
+                return true;
+            }
+            finally
+            {
+                networkManager.OnClientConnectedCallback -= OnConnected;
+                networkManager.OnClientDisconnectCallback -= OnDisconnected;
+            }
         }
         catch (Exception e)
         {
