@@ -20,6 +20,8 @@ public class LobbyManager : MonoBehaviour
     const float PollInterval = 1.5f;
     const string PlayerNameKey = "PlayerName";
     const string ReadyKey = "Ready";
+    const string ProtocolVersionKey = "ProtocolVersion";
+    const string NetworkProtocolVersion = "polyart-1";
 
     public string LastErrorMessage { get; private set; }
 
@@ -66,6 +68,12 @@ public class LobbyManager : MonoBehaviour
                         "RelayJoinCode", new DataObject(
                             DataObject.VisibilityOptions.Member,
                             relayJoinCode)
+                    },
+                    {
+                        ProtocolVersionKey, new DataObject(
+                            DataObject.VisibilityOptions.Public,
+                            NetworkProtocolVersion,
+                            DataObject.IndexOptions.S1)
                     }
                 }
             };
@@ -109,6 +117,12 @@ public class LobbyManager : MonoBehaviour
                         "RelayJoinCode", new DataObject(
                             DataObject.VisibilityOptions.Member,
                             relayJoinCode)
+                    },
+                    {
+                        ProtocolVersionKey, new DataObject(
+                            DataObject.VisibilityOptions.Public,
+                            NetworkProtocolVersion,
+                            DataObject.IndexOptions.S1)
                     }
                 }
             };
@@ -141,6 +155,13 @@ public class LobbyManager : MonoBehaviour
             SetCurrentLobby(await LobbyService.Instance.JoinLobbyByCodeAsync(lobbyCode, options));
             Debug.Log($"[Lobby] Joined: {m_CurrentLobby.Name}");
 
+            if (!IsCompatibleLobby(m_CurrentLobby))
+            {
+                await LeaveLobby();
+                LastErrorMessage = "This lobby uses a different game version.";
+                return false;
+            }
+
             string relayJoinCode = m_CurrentLobby.Data["RelayJoinCode"].Value;
             bool joinedRelay = await RelayManager.Instance.JoinRelay(relayJoinCode);
             if (!joinedRelay)
@@ -167,7 +188,14 @@ public class LobbyManager : MonoBehaviour
             LastErrorMessage = string.Empty;
             QuickJoinLobbyOptions options = new QuickJoinLobbyOptions
             {
-                Player = CreatePlayerData(playerName)
+                Player = CreatePlayerData(playerName),
+                Filter = new List<QueryFilter>
+                {
+                    new QueryFilter(
+                        QueryFilter.FieldOptions.S1,
+                        NetworkProtocolVersion,
+                        QueryFilter.OpOptions.EQ)
+                }
             };
 
             SetCurrentLobby(await LobbyService.Instance.QuickJoinLobbyAsync(options));
@@ -361,6 +389,13 @@ public class LobbyManager : MonoBehaviour
         }
 
         return false;
+    }
+
+    bool IsCompatibleLobby(Lobby lobby)
+    {
+        return lobby?.Data != null &&
+               lobby.Data.TryGetValue(ProtocolVersionKey, out DataObject version) &&
+               version.Value == NetworkProtocolVersion;
     }
 
     public bool IsLocalPlayerReady()
