@@ -106,6 +106,14 @@ public class MenuUI : MonoBehaviour
 
     void Update()
     {
+        // Scene callbacks can be missed while a Multiplayer Play Mode client is
+        // changing scenes. The active scene is the durable source of truth.
+        if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == GameSceneName)
+        {
+            EnsureGameplaySceneTransitionCompletes();
+            return;
+        }
+
         EnsureNetworkSceneSubscription();
         m_Toolkit?.Tick(Time.unscaledTime);
         if (m_Toolkit != null && m_Toolkit.IsRenderable && m_Canvas != null && m_Canvas.enabled)
@@ -221,7 +229,7 @@ public class MenuUI : MonoBehaviour
         }
         else if (sceneEvent.SceneEventType == SceneEventType.LoadEventCompleted && !m_IsTransitionCompleting)
         {
-            StartCoroutine(FinishGameplayTransition());
+            EnsureGameplaySceneTransitionCompletes();
         }
     }
 
@@ -232,20 +240,7 @@ public class MenuUI : MonoBehaviour
             return;
         }
 
-        if (!m_IsTransitioningToGameplay)
-        {
-            BeginGameplayTransition("Deploying To Arena", "Synchronizing with the host...");
-        }
-
-        if (m_IsTransitionCompleting)
-        {
-            return;
-        }
-
-        m_LoadingOverlay.SetMessage("Scene activated. Finalizing deployment...");
-        m_LoadingOverlay.SetProgress(0.96f);
-        m_Toolkit?.SetLoading("Deploying To Arena", "Scene activated. Finalizing deployment...", 0.96f);
-        StartCoroutine(FinishGameplayTransition());
+        EnsureGameplaySceneTransitionCompletes();
     }
 
     void ShowScreen(MenuScreenState state, bool instant = false)
@@ -318,6 +313,27 @@ public class MenuUI : MonoBehaviour
         m_LoadingOverlay.SetMessage(message);
         m_LoadingOverlay.SetProgress(0.18f);
         m_Toolkit?.ShowLoading(title, message, 0.18f);
+    }
+
+    void EnsureGameplaySceneTransitionCompletes()
+    {
+        if (m_IsDestroyed || m_IsTransitionCompleting)
+        {
+            return;
+        }
+
+        if (!m_IsTransitioningToGameplay)
+        {
+            BeginGameplayTransition("Deploying To Arena", "Synchronizing with the host...");
+        }
+
+        m_LoadingOverlay.SetMessage("Scene activated. Finalizing deployment...");
+        m_LoadingOverlay.SetProgress(0.96f);
+        m_Toolkit?.SetLoading(
+            "Deploying To Arena",
+            "Scene activated. Finalizing deployment...",
+            0.96f);
+        StartCoroutine(FinishGameplayTransition());
     }
 
     IEnumerator FinishGameplayTransition()
@@ -787,7 +803,14 @@ public class MenuUI : MonoBehaviour
         m_LoadingOverlay.SetMessage("Loading combat zone...");
         m_LoadingOverlay.SetProgress(0.46f);
         m_Toolkit?.SetLoading("Deploying To Arena", "Loading combat zone...", 0.46f);
-        NetworkManager.Singleton.SceneManager.LoadScene(GameSceneName, UnityEngine.SceneManagement.LoadSceneMode.Single);
+        SceneEventProgressStatus loadStatus = NetworkManager.Singleton.SceneManager.LoadScene(
+            GameSceneName,
+            UnityEngine.SceneManagement.LoadSceneMode.Single);
+        if (loadStatus != SceneEventProgressStatus.Started)
+        {
+            CancelGameplayTransition($"Could not synchronize arena scene ({loadStatus})");
+            Debug.LogError($"[Menu] Network scene load failed to start: {loadStatus}");
+        }
     }
 
     void OnCopyCode()
