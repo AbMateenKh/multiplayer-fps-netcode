@@ -801,7 +801,7 @@ public class MenuUI : MonoBehaviour
         if (LobbyManager.Instance != null)
         {
             LobbyManager.Instance.OnLobbyPlayersChanged -= OnLobbyPlayersChanged;
-            LobbyManager.Instance.LeaveLobby();
+            _ = LobbyManager.Instance.LeaveLobby();
         }
 
         if (NetworkManager.Singleton != null && (NetworkManager.Singleton.IsHost || NetworkManager.Singleton.IsClient))

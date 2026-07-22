@@ -8,7 +8,12 @@ namespace Unity.FPS.Gameplay
 {
     public sealed class AstronautPlayerVisual : NetworkBehaviour
     {
-        const float k_StateSendInterval = 0.08f;
+        // Transform replication runs at the NetworkManager tick rate. Keep the visual
+        // state cadence high enough that a remote locomotion blend never looks delayed.
+        const float k_StateSendInterval = 0.05f;
+        const float k_RemoteVisualSmoothTime = 0.065f;
+        const float k_RemoteVisualRotationSharpness = 22f;
+        const float k_RemoteVisualTeleportDistance = 3.5f;
 
         static readonly int SpeedHash = Animator.StringToHash("Speed");
         static readonly int GroundedHash = Animator.StringToHash("Grounded");
@@ -20,6 +25,8 @@ namespace Unity.FPS.Gameplay
         public GameObject CharacterRoot;
         public Animator CharacterAnimator;
         public Transform AimTorso;
+        [Tooltip("Package pistol animated with the astronaut's armed clips. This is a visual-only child.")]
+        public Transform CharacterWeapon;
 
         readonly NetworkVariable<float> m_MoveSpeed = new(
             0f,
@@ -50,6 +57,10 @@ namespace Unity.FPS.Gameplay
         Transform m_AimTorso;
         float m_NextStateSendTime;
         float m_VisualAimPitch;
+        Vector3 m_RemoteVisualVelocity;
+        Vector3 m_RemoteVisualWorldPosition;
+        Quaternion m_RemoteVisualWorldRotation;
+        bool m_HasRemoteVisualState;
 
         public override void OnNetworkSpawn()
         {
@@ -59,6 +70,7 @@ namespace Unity.FPS.Gameplay
 
             DisablePrototypeRenderers();
             BindAuthoredCharacterVisual();
+            ConfigureWeaponPresentation();
 
             m_ShotSequence.OnValueChanged += OnShotSequenceChanged;
             if (m_Health != null)
@@ -125,7 +137,7 @@ namespace Unity.FPS.Gameplay
 
             if (m_Animator != null)
             {
-                m_Animator.SetFloat(SpeedHash, m_MoveSpeed.Value, 0.1f, Time.deltaTime);
+                m_Animator.SetFloat(SpeedHash, m_MoveSpeed.Value, 0.06f, Time.deltaTime);
                 m_Animator.SetBool(GroundedHash, m_Grounded.Value);
             }
         }
@@ -134,6 +146,8 @@ namespace Unity.FPS.Gameplay
         {
             if (m_Animator == null || m_AimTorso == null)
                 return;
+
+            UpdateRemoteVisualSmoothing();
 
             float aimSharpness = 1f - Mathf.Exp(-14f * Time.deltaTime);
             m_VisualAimPitch = Mathf.LerpAngle(
@@ -146,6 +160,50 @@ namespace Unity.FPS.Gameplay
             m_AimTorso.localRotation *= Quaternion.AngleAxis(
                 m_VisualAimPitch * 0.55f,
                 Vector3.right);
+        }
+
+        void UpdateRemoteVisualSmoothing()
+        {
+            if (IsOwner || m_VisualInstance == null)
+                return;
+
+            Transform visualTransform = m_VisualInstance.transform;
+            Vector3 networkPosition = transform.position;
+            Quaternion networkRotation = transform.rotation;
+
+            if (!m_HasRemoteVisualState ||
+                Vector3.Distance(m_RemoteVisualWorldPosition, networkPosition) >
+                k_RemoteVisualTeleportDistance)
+            {
+                m_RemoteVisualWorldPosition = networkPosition;
+                m_RemoteVisualWorldRotation = networkRotation;
+                m_RemoteVisualVelocity = Vector3.zero;
+                m_HasRemoteVisualState = true;
+            }
+            else
+            {
+                m_RemoteVisualWorldPosition = Vector3.SmoothDamp(
+                    m_RemoteVisualWorldPosition,
+                    networkPosition,
+                    ref m_RemoteVisualVelocity,
+                    k_RemoteVisualSmoothTime,
+                    Mathf.Infinity,
+                    Time.deltaTime);
+
+                float rotationT = 1f - Mathf.Exp(
+                    -k_RemoteVisualRotationSharpness * Time.deltaTime);
+                m_RemoteVisualWorldRotation = Quaternion.Slerp(
+                    m_RemoteVisualWorldRotation,
+                    networkRotation,
+                    rotationT);
+            }
+
+            // This offsets only the third-person presentation under the replicated
+            // Player root. Collisions, hit validation, and the NetworkTransform remain
+            // authoritative and untouched.
+            visualTransform.SetPositionAndRotation(
+                m_RemoteVisualWorldPosition,
+                m_RemoteVisualWorldRotation);
         }
 
         void BindAuthoredCharacterVisual()
@@ -177,6 +235,44 @@ namespace Unity.FPS.Gameplay
                 {
                     renderer.shadowCastingMode = ShadowCastingMode.ShadowsOnly;
                 }
+            }
+        }
+
+        void ConfigureWeaponPresentation()
+        {
+            // PlayerWeaponsManager creates the original first-person weapon for every
+            // player instance. It belongs only to its owner; leaving it active remotely
+            // produces the detached gun seen beside third-person astronauts.
+            if (!IsOwner)
+            {
+                StartCoroutine(HideRemoteViewModelAfterInitialization());
+            }
+
+            if (CharacterWeapon == null)
+            {
+                Debug.LogWarning(
+                    "[Astronaut Visual] Player.prefab is missing the package pistol reference.",
+                    this);
+                return;
+            }
+
+            CharacterWeapon.gameObject.SetActive(true);
+        }
+
+        IEnumerator HideRemoteViewModelAfterInitialization()
+        {
+            // PlayerWeaponsManager.Start builds its gameplay weapon state in Start.
+            // Keep the hierarchy active for that work, then hide only the remote
+            // first-person renderers after Start has completed.
+            yield return null;
+
+            if (m_Weapons == null || m_Weapons.WeaponParentSocket == null)
+                yield break;
+
+            foreach (Renderer renderer in
+                     m_Weapons.WeaponParentSocket.GetComponentsInChildren<Renderer>(true))
+            {
+                renderer.enabled = false;
             }
         }
 

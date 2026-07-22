@@ -93,10 +93,20 @@ namespace Unity.FPS.Editor
                 animator.applyRootMotion = false;
                 animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
 
+                Transform packageWeapon = FindDescendant(character.transform, "Pistol");
+                if (packageWeapon == null)
+                    throw new InvalidOperationException("The authored astronaut has no package Pistol mesh.");
+
                 if (material != null)
                 {
                     foreach (Renderer renderer in character.GetComponentsInChildren<Renderer>(true))
                     {
+                        // The pistol has its own package material. Applying the astronaut
+                        // atlas to it makes the held weapon look broken.
+                        if (renderer.transform == packageWeapon ||
+                            renderer.transform.IsChildOf(packageWeapon))
+                            continue;
+
                         Material[] materials = renderer.sharedMaterials;
                         Array.Fill(materials, material);
                         renderer.sharedMaterials = materials;
@@ -106,6 +116,7 @@ namespace Unity.FPS.Editor
                 visual.CharacterRoot = character;
                 visual.CharacterAnimator = animator;
                 visual.AimTorso = FindDescendant(character.transform, "Torso");
+                visual.CharacterWeapon = packageWeapon;
                 if (visual.AimTorso == null)
                     throw new InvalidOperationException("The authored astronaut has no Torso bone.");
 

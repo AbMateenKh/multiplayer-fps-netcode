@@ -13,6 +13,9 @@ public class LobbyManager : MonoBehaviour
     Lobby m_CurrentLobby;
     float m_HeartbeatTimer;
     float m_PollTimer;
+    int m_LobbyGeneration;
+    bool m_PollInFlight;
+    bool m_IsLeavingLobby;
     const float HeartbeatInterval = 15f;
     const float PollInterval = 1.5f;
     const string PlayerNameKey = "PlayerName";
@@ -67,8 +70,8 @@ public class LobbyManager : MonoBehaviour
                 }
             };
 
-            m_CurrentLobby = await LobbyService.Instance.CreateLobbyAsync(
-                lobbyName, maxPlayers, options);
+            SetCurrentLobby(await LobbyService.Instance.CreateLobbyAsync(
+                lobbyName, maxPlayers, options));
 
             Debug.Log($"[Lobby] Public lobby created: {m_CurrentLobby.Name}");
             NotifyPlayersChanged();
@@ -110,8 +113,8 @@ public class LobbyManager : MonoBehaviour
                 }
             };
 
-            m_CurrentLobby = await LobbyService.Instance.CreateLobbyAsync(
-                lobbyName, maxPlayers, options);
+            SetCurrentLobby(await LobbyService.Instance.CreateLobbyAsync(
+                lobbyName, maxPlayers, options));
 
             Debug.Log($"[Lobby] Private lobby created. Code: {m_CurrentLobby.LobbyCode}");
             NotifyPlayersChanged();
@@ -135,7 +138,7 @@ public class LobbyManager : MonoBehaviour
                 Player = CreatePlayerData(playerName)
             };
 
-            m_CurrentLobby = await LobbyService.Instance.JoinLobbyByCodeAsync(lobbyCode, options);
+            SetCurrentLobby(await LobbyService.Instance.JoinLobbyByCodeAsync(lobbyCode, options));
             Debug.Log($"[Lobby] Joined: {m_CurrentLobby.Name}");
 
             string relayJoinCode = m_CurrentLobby.Data["RelayJoinCode"].Value;
@@ -165,7 +168,7 @@ public class LobbyManager : MonoBehaviour
                 Player = CreatePlayerData(playerName)
             };
 
-            m_CurrentLobby = await LobbyService.Instance.QuickJoinLobbyAsync(options);
+            SetCurrentLobby(await LobbyService.Instance.QuickJoinLobbyAsync(options));
             Debug.Log($"[Lobby] Quick joined: {m_CurrentLobby.Name}");
 
             string relayJoinCode = m_CurrentLobby.Data["RelayJoinCode"].Value;
@@ -214,28 +217,38 @@ public class LobbyManager : MonoBehaviour
         if (m_HeartbeatTimer >= HeartbeatInterval)
         {
             m_HeartbeatTimer = 0f;
-            LobbyService.Instance.SendHeartbeatPingAsync(m_CurrentLobby.Id);
+            SendHeartbeat(m_CurrentLobby.Id, m_LobbyGeneration);
         }
     }
 
     void HandlePollForUpdates()
     {
-        if (m_CurrentLobby == null) return;
+        if (m_CurrentLobby == null || m_IsLeavingLobby || m_PollInFlight) return;
 
         m_PollTimer += Time.deltaTime;
         if (m_PollTimer >= PollInterval)
         {
             m_PollTimer = 0f;
-            PollLobby();
+            PollLobby(m_CurrentLobby.Id, m_LobbyGeneration);
         }
     }
 
-    async void PollLobby()
+    async void PollLobby(string lobbyId, int generation)
     {
+        m_PollInFlight = true;
         try
         {
-            string previousState = BuildLobbyPlayersState(m_CurrentLobby);
-            Lobby updated = await LobbyService.Instance.GetLobbyAsync(m_CurrentLobby.Id);
+            Lobby currentLobby = m_CurrentLobby;
+            if (!IsCurrentLobbyRequest(lobbyId, generation) || currentLobby == null)
+                return;
+
+            string previousState = BuildLobbyPlayersState(currentLobby);
+            Lobby updated = await LobbyService.Instance.GetLobbyAsync(lobbyId);
+
+            // The player can leave while the request is in flight.
+            if (!IsCurrentLobbyRequest(lobbyId, generation))
+                return;
+
             string updatedState = BuildLobbyPlayersState(updated);
             bool playersChanged = previousState != updatedState;
             m_CurrentLobby = updated;
@@ -247,9 +260,31 @@ public class LobbyManager : MonoBehaviour
         }
         catch (Exception e)
         {
+            if (!IsCurrentLobbyRequest(lobbyId, generation))
+                return;
+
             Debug.LogError($"[Lobby] Poll failed: {e.Message}");
             LastErrorMessage = "Lost lobby connection. Return to menu and try again.";
-            m_CurrentLobby = null;
+            ClearCurrentLobby();
+        }
+        finally
+        {
+            m_PollInFlight = false;
+        }
+    }
+
+    async void SendHeartbeat(string lobbyId, int generation)
+    {
+        try
+        {
+            await LobbyService.Instance.SendHeartbeatPingAsync(lobbyId);
+        }
+        catch (Exception e)
+        {
+            if (IsCurrentLobbyRequest(lobbyId, generation))
+            {
+                Debug.LogWarning($"[Lobby] Heartbeat failed: {e.Message}");
+            }
         }
     }
 
@@ -380,10 +415,16 @@ public class LobbyManager : MonoBehaviour
                 }
             };
 
-            m_CurrentLobby = await LobbyService.Instance.UpdatePlayerAsync(
-                m_CurrentLobby.Id,
+            string lobbyId = m_CurrentLobby.Id;
+            int generation = m_LobbyGeneration;
+            Lobby updated = await LobbyService.Instance.UpdatePlayerAsync(
+                lobbyId,
                 AuthenticationService.Instance.PlayerId,
                 options);
+            if (!IsCurrentLobbyRequest(lobbyId, generation))
+                return false;
+
+            m_CurrentLobby = updated;
             NotifyPlayersChanged();
             return true;
         }
@@ -405,22 +446,64 @@ public class LobbyManager : MonoBehaviour
     public int GetMaxPlayers() => m_CurrentLobby?.MaxPlayers ?? 4;
     public int GetCurrentPlayerCount() => m_CurrentLobby?.Players?.Count ?? 0;
 
-    public async void LeaveLobby()
+    public async Task LeaveLobby()
     {
+        Lobby leavingLobby = m_CurrentLobby;
+        if (leavingLobby == null || m_IsLeavingLobby)
+            return;
+
+        bool localPlayerIsHost = leavingLobby.HostId == AuthenticationService.Instance.PlayerId;
+        m_IsLeavingLobby = true;
+        ClearCurrentLobby();
+
         try
         {
-            if (m_CurrentLobby != null)
+            // A host ending a match closes its lobby. Connected clients are then
+            // disconnected by Netcode instead of inheriting a dead Relay session.
+            if (localPlayerIsHost)
+            {
+                await LobbyService.Instance.DeleteLobbyAsync(leavingLobby.Id);
+            }
+            else
             {
                 await LobbyService.Instance.RemovePlayerAsync(
-                    m_CurrentLobby.Id,
+                    leavingLobby.Id,
                     AuthenticationService.Instance.PlayerId);
-                m_CurrentLobby = null;
             }
         }
         catch (Exception e)
         {
-            Debug.LogError($"[Lobby] Failed to leave: {e.Message}");
+            Debug.LogWarning($"[Lobby] Leave request did not complete: {e.Message}");
         }
+        finally
+        {
+            m_IsLeavingLobby = false;
+        }
+    }
+
+    void SetCurrentLobby(Lobby lobby)
+    {
+        m_CurrentLobby = lobby;
+        m_LobbyGeneration++;
+        m_IsLeavingLobby = false;
+        m_PollTimer = 0f;
+        m_HeartbeatTimer = 0f;
+    }
+
+    void ClearCurrentLobby()
+    {
+        m_CurrentLobby = null;
+        m_LobbyGeneration++;
+        m_PollTimer = 0f;
+        m_HeartbeatTimer = 0f;
+    }
+
+    bool IsCurrentLobbyRequest(string lobbyId, int generation)
+    {
+        return !m_IsLeavingLobby &&
+               m_CurrentLobby != null &&
+               m_LobbyGeneration == generation &&
+               m_CurrentLobby.Id == lobbyId;
     }
 }
 
