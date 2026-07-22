@@ -14,9 +14,6 @@ namespace Unity.FPS.Gameplay
     public sealed class NetworkPlayerPresentation : NetworkBehaviour
     {
         const float StateSendInterval = 0.05f;
-        const float RemoteVisualSmoothTime = 0.065f;
-        const float RemoteVisualRotationSharpness = 22f;
-        const float RemoteVisualTeleportDistance = 3.5f;
 
         static readonly int MoveXHash = Animator.StringToHash("MoveX");
         static readonly int MoveYHash = Animator.StringToHash("MoveY");
@@ -65,13 +62,6 @@ namespace Unity.FPS.Gameplay
         float m_VisualAimPitch;
         float m_HitFlinch;
         bool m_WasReloading;
-
-        Vector3 m_AuthoredLocalPosition;
-        Quaternion m_AuthoredLocalRotation;
-        Vector3 m_RemoteVisualVelocity;
-        Vector3 m_RemoteVisualWorldPosition;
-        Quaternion m_RemoteVisualWorldRotation;
-        bool m_HasRemoteVisualState;
 
         public override void OnNetworkSpawn()
         {
@@ -144,8 +134,6 @@ namespace Unity.FPS.Gameplay
             if (CharacterAnimator == null || AimTorso == null)
                 return;
 
-            UpdateRemoteVisualSmoothing();
-
             float aimT = 1f - Mathf.Exp(-14f * Time.deltaTime);
             m_VisualAimPitch = Mathf.LerpAngle(m_VisualAimPitch, m_AimPitch.Value, aimT);
 
@@ -189,10 +177,6 @@ namespace Unity.FPS.Gameplay
                 return;
             }
 
-            Transform visualTransform = CharacterRoot.transform;
-            m_AuthoredLocalPosition = visualTransform.localPosition;
-            m_AuthoredLocalRotation = visualTransform.localRotation;
-
             CharacterAnimator.enabled = true;
             CharacterAnimator.applyRootMotion = false;
             CharacterAnimator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
@@ -214,45 +198,6 @@ namespace Unity.FPS.Gameplay
                     renderer.shadowCastingMode = ShadowCastingMode.ShadowsOnly;
                 }
             }
-        }
-
-        void UpdateRemoteVisualSmoothing()
-        {
-            if (IsOwner || CharacterRoot == null)
-                return;
-
-            Vector3 targetPosition = transform.TransformPoint(m_AuthoredLocalPosition);
-            Quaternion targetRotation = transform.rotation * m_AuthoredLocalRotation;
-
-            if (!m_HasRemoteVisualState ||
-                Vector3.Distance(m_RemoteVisualWorldPosition, targetPosition) >
-                RemoteVisualTeleportDistance)
-            {
-                m_RemoteVisualWorldPosition = targetPosition;
-                m_RemoteVisualWorldRotation = targetRotation;
-                m_RemoteVisualVelocity = Vector3.zero;
-                m_HasRemoteVisualState = true;
-            }
-            else
-            {
-                m_RemoteVisualWorldPosition = Vector3.SmoothDamp(
-                    m_RemoteVisualWorldPosition,
-                    targetPosition,
-                    ref m_RemoteVisualVelocity,
-                    RemoteVisualSmoothTime,
-                    Mathf.Infinity,
-                    Time.deltaTime);
-
-                float rotationT = 1f - Mathf.Exp(-RemoteVisualRotationSharpness * Time.deltaTime);
-                m_RemoteVisualWorldRotation = Quaternion.Slerp(
-                    m_RemoteVisualWorldRotation,
-                    targetRotation,
-                    rotationT);
-            }
-
-            CharacterRoot.transform.SetPositionAndRotation(
-                m_RemoteVisualWorldPosition,
-                m_RemoteVisualWorldRotation);
         }
 
         IEnumerator HideRemoteFirstPersonWeapons()

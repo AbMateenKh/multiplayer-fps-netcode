@@ -801,13 +801,13 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   NetworkTransformExpanded: 0
   AutoOwnerAuthorityTickOffset: 1
-  PositionInterpolationType: 1
+  PositionInterpolationType: 2
   RotationInterpolationType: 1
   ScaleInterpolationType: 0
-  PositionLerpSmoothing: 1
-  PositionMaxInterpolationTime: 0.035
+  PositionLerpSmoothing: 0
+  PositionMaxInterpolationTime: 0.06
   RotationLerpSmoothing: 1
-  RotationMaxInterpolationTime: 0.025
+  RotationMaxInterpolationTime: 0.04
   ScaleLerpSmoothing: 1
   ScaleMaxInterpolationTime: 0.1
   AuthorityMode: 1

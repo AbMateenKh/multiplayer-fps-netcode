@@ -61,6 +61,7 @@ namespace Unity.FPS.Editor
                 presentation.AimTorso = chest;
                 presentation.CharacterWeapon = rifle;
 
+                ConfigureNetworkTransform(root);
                 ValidateNetworkHierarchy(root, character);
                 PrefabUtility.SaveAsPrefabAsset(root, PlayerPrefabPath);
             }
@@ -129,6 +130,26 @@ namespace Unity.FPS.Editor
             jetpackVfx.name = "JetpackVFX";
             RenameChild(jetpackVfx, "VFX_JetpackTrail_left", "JetpackTrailLeft");
             RenameChild(jetpackVfx, "VFX_JetpackTrail_right", "JetpackTrailRight");
+        }
+
+        static void ConfigureNetworkTransform(GameObject root)
+        {
+            NetworkTransform networkTransform = root.GetComponent<NetworkTransform>();
+            if (networkTransform == null)
+                throw new InvalidOperationException("Player root must contain NetworkTransform.");
+
+            // Use one rate-aware interpolation layer for remote motion. A second
+            // visual-child smoother causes repeated acceleration as snapshots arrive.
+            networkTransform.PositionInterpolationType =
+                NetworkTransform.InterpolationTypes.SmoothDampening;
+            networkTransform.PositionLerpSmoothing = false;
+            networkTransform.PositionMaxInterpolationTime = 0.06f;
+            networkTransform.RotationInterpolationType =
+                NetworkTransform.InterpolationTypes.Lerp;
+            networkTransform.RotationLerpSmoothing = true;
+            networkTransform.RotationMaxInterpolationTime = 0.04f;
+            networkTransform.Interpolate = true;
+            networkTransform.UseUnreliableDeltas = true;
         }
 
         static void DestroyChild(Transform root, string path)
