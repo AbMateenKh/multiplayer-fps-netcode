@@ -9,6 +9,10 @@ namespace Unity.FPS.Editor
 {
     public static class PolyartAnimationSetup
     {
+        // Presentation normalizes velocity against sprint speed. With a 1.5x sprint
+        // modifier, regular movement therefore lands exactly at two-thirds magnitude.
+        const float WalkBlendMagnitude = 2f / 3f;
+
         public const string ControllerPath =
             "Assets/Multiplayer/Art/Characters/Animation/PolyartNetwork.controller";
 
@@ -101,11 +105,19 @@ namespace Unity.FPS.Editor
             AssetDatabase.AddObjectToAsset(locomotionTree, controller);
 
             locomotionTree.AddChild(clips["Idle"], Vector2.zero);
-            locomotionTree.AddChild(clips["WalkForward"], new Vector2(0f, 0.45f));
+            locomotionTree.AddChild(
+                clips["WalkForward"],
+                new Vector2(0f, WalkBlendMagnitude));
             locomotionTree.AddChild(clips["RunForward"], new Vector2(0f, 1f));
-            locomotionTree.AddChild(clips["WalkBackward"], new Vector2(0f, -0.7f));
-            locomotionTree.AddChild(clips["WalkLeft"], new Vector2(-0.7f, 0f));
-            locomotionTree.AddChild(clips["WalkRight"], new Vector2(0.7f, 0f));
+            locomotionTree.AddChild(
+                clips["WalkBackward"],
+                new Vector2(0f, -WalkBlendMagnitude));
+            locomotionTree.AddChild(
+                clips["WalkLeft"],
+                new Vector2(-WalkBlendMagnitude, 0f));
+            locomotionTree.AddChild(
+                clips["WalkRight"],
+                new Vector2(WalkBlendMagnitude, 0f));
 
             AnimatorState locomotion = AddState(machine, "Locomotion", locomotionTree);
             AnimatorState jump = AddState(machine, "Jump", clips["Jump"]);
@@ -190,11 +202,19 @@ namespace Unity.FPS.Editor
             AssetDatabase.AddObjectToAsset(locomotionTree, controller);
 
             locomotionTree.AddChild(clips["Idle"], Vector2.zero);
-            locomotionTree.AddChild(clips["WalkForward"], new Vector2(0f, 0.45f));
+            locomotionTree.AddChild(
+                clips["WalkForward"],
+                new Vector2(0f, WalkBlendMagnitude));
             locomotionTree.AddChild(clips["RunForward"], new Vector2(0f, 1f));
-            locomotionTree.AddChild(clips["WalkBackward"], new Vector2(0f, -0.7f));
-            locomotionTree.AddChild(clips["WalkLeft"], new Vector2(-0.7f, 0f));
-            locomotionTree.AddChild(clips["WalkRight"], new Vector2(0.7f, 0f));
+            locomotionTree.AddChild(
+                clips["WalkBackward"],
+                new Vector2(0f, -WalkBlendMagnitude));
+            locomotionTree.AddChild(
+                clips["WalkLeft"],
+                new Vector2(-WalkBlendMagnitude, 0f));
+            locomotionTree.AddChild(
+                clips["WalkRight"],
+                new Vector2(WalkBlendMagnitude, 0f));
 
             AnimatorState locomotion = AddState(machine, "Locomotion", locomotionTree);
             AnimatorState jump = AddState(machine, "Jump", clips["Jump"]);

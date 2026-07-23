@@ -14,7 +14,9 @@ namespace Unity.FPS.Editor
         const string CharacterPrefabPath =
             "Assets/SciFiWarriorPBRHPPolyart/Prefabs/PolyartCharacter.prefab";
         const string CharacterRootName = "CharacterVisual";
-        static readonly Vector3 CharacterLocalPosition = new(0f, 0.35f, 0f);
+        const float GroundSpeed = 7.5f;
+        const float GroundAccelerationSharpness = 10f;
+        static readonly Vector3 CharacterLocalPosition = Vector3.zero;
         static readonly Vector3 CharacterLocalScale = Vector3.one * 0.75f;
 
         [MenuItem("Tools/Portfolio/Characters/Author Polyart Network Player Prefab")]
@@ -51,6 +53,8 @@ namespace Unity.FPS.Editor
                 animator.updateMode = AnimatorUpdateMode.Normal;
                 animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
 
+                ConfigureCharacterMovement(root);
+
                 Transform chest = FindRequiredChild(character.transform, "Chest");
                 Transform rifle = FindRequiredChild(character.transform, "AssaultRifle");
 
@@ -75,6 +79,18 @@ namespace Unity.FPS.Editor
             Debug.Log(
                 "[Polyart Authoring] Player.prefab now contains the Polyart character, " +
                 "rifle, Humanoid Animator, controller, and network presentation references.");
+        }
+
+        static void ConfigureCharacterMovement(GameObject root)
+        {
+            PlayerCharacterController characterController =
+                root.GetComponent<PlayerCharacterController>();
+            if (characterController == null)
+                throw new InvalidOperationException(
+                    "Player prefab is missing PlayerCharacterController.");
+
+            characterController.MaxSpeedOnGround = GroundSpeed;
+            characterController.MovementSharpnessOnGround = GroundAccelerationSharpness;
         }
 
         [MenuItem("Tools/Portfolio/Characters/Clean Player Prefab Hierarchy")]

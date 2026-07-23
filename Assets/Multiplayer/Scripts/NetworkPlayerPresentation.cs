@@ -13,7 +13,8 @@ namespace Unity.FPS.Gameplay
     /// </summary>
     public sealed class NetworkPlayerPresentation : NetworkBehaviour
     {
-        const float StateSendInterval = 0.05f;
+        const float StateSendInterval = 1f / 30f;
+        const float LocomotionDamping = 0.05f;
 
         static readonly int MoveXHash = Animator.StringToHash("MoveX");
         static readonly int MoveYHash = Animator.StringToHash("MoveY");
@@ -120,8 +121,16 @@ namespace Unity.FPS.Gameplay
 
             if (CharacterAnimator != null)
             {
-                CharacterAnimator.SetFloat(MoveXHash, m_LocalMove.Value.x, 0.08f, Time.deltaTime);
-                CharacterAnimator.SetFloat(MoveYHash, m_LocalMove.Value.y, 0.08f, Time.deltaTime);
+                CharacterAnimator.SetFloat(
+                    MoveXHash,
+                    m_LocalMove.Value.x,
+                    LocomotionDamping,
+                    Time.deltaTime);
+                CharacterAnimator.SetFloat(
+                    MoveYHash,
+                    m_LocalMove.Value.y,
+                    LocomotionDamping,
+                    Time.deltaTime);
                 CharacterAnimator.SetBool(GroundedHash, m_Grounded.Value);
             }
 
