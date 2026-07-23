@@ -195,11 +195,6 @@ public class MenuUI : MonoBehaviour
         ShowScreen(MenuScreenState.ModeSelect);
         SetStatus("Host disconnected. Match ended.");
         UnlockCursor();
-
-        if (NetworkManager.Singleton.IsListening)
-        {
-            NetworkManager.Singleton.Shutdown();
-        }
     }
 
     void OnNetworkSceneEvent(SceneEvent sceneEvent)

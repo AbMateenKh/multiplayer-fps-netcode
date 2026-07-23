@@ -131,17 +131,35 @@ public class RelayManager : MonoBehaviour
 
                 if (completed != connectionResult.Task || !connectionResult.Task.Result)
                 {
+                    bool timedOut = completed != connectionResult.Task;
                     string disconnectReason = networkManager.DisconnectReason;
-                    LastErrorMessage = string.IsNullOrWhiteSpace(disconnectReason)
-                        ? "The host rejected the connection. Restart both game instances so they use the same project version."
-                        : disconnectReason;
+                    if (!string.IsNullOrWhiteSpace(disconnectReason))
+                    {
+                        LastErrorMessage = disconnectReason;
+                    }
+                    else if (timedOut)
+                    {
+                        LastErrorMessage =
+                            "Relay connection timed out. Ask the host to create a fresh lobby.";
+                    }
+                    else
+                    {
+                        LastErrorMessage =
+                            "The host rejected the connection. Restart both game instances " +
+                            "so they use the same project version.";
+                    }
 
-                    if (networkManager.IsListening || networkManager.ShutdownInProgress)
+                    // A disconnect callback can resume this method while NGO is already
+                    // tearing down. Calling Shutdown again from that path re-enters UTP
+                    // and can produce a misleading Relay "not connected" error.
+                    if (networkManager.IsListening && !networkManager.ShutdownInProgress)
                     {
                         networkManager.Shutdown();
                     }
 
-                    Debug.LogWarning($"[Relay] Client connection was not approved: {LastErrorMessage}");
+                    string failureStage = timedOut ? "timed out" : "was disconnected";
+                    Debug.LogWarning(
+                        $"[Relay] Client {failureStage} before approval: {LastErrorMessage}");
                     return false;
                 }
 
