@@ -430,7 +430,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 1
   GroundCheckDistance: 1
-  MaxSpeedOnGround: 7.5
+  MaxSpeedOnGround: 6
   MovementSharpnessOnGround: 10
   MaxSpeedCrouchedRatio: 0.5
   MaxSpeedInAir: 10

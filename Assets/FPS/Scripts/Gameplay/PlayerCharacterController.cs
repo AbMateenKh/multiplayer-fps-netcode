@@ -427,14 +427,27 @@ namespace Unity.FPS.Gameplay
             PlayerCamera.transform.localEulerAngles = new Vector3(m_CameraVerticalAngle, 0, 0);
 
             // Movement — owner moves, NetworkTransform syncs to all
-            bool isSprinting = m_InputHandler.GetSprintInputHeld();
+            Vector2 moveInput = m_InputHandler.GetMoveInput();
+            bool isSprinting =
+                m_InputHandler.GetSprintInputHeld() &&
+                moveInput.y > 0.1f;
             if (isSprinting)
             {
                 isSprinting = SetCrouchingState(false, false);
             }
 
-            float speedModifier = isSprinting ? SprintSpeedModifier : 1f;
-            Vector3 worldspaceMoveInput = transform.TransformVector(m_InputHandler.GetMoveInput());
+            // The available animation set has only a forward run. Taper sprint
+            // toward walk speed as input turns sideways so diagonal/strafe motion
+            // does not outrun the authored armed-walk clips.
+            float sprintAmount = 0f;
+            if (isSprinting)
+            {
+                float lateralPenalty = 1f - Mathf.Clamp01(Mathf.Abs(moveInput.x));
+                sprintAmount = Mathf.Clamp01(moveInput.y) * lateralPenalty;
+            }
+
+            float speedModifier = Mathf.Lerp(1f, SprintSpeedModifier, sprintAmount);
+            Vector3 worldspaceMoveInput = transform.TransformVector(moveInput);
 
             if (IsGrounded)
             {
@@ -464,7 +477,9 @@ namespace Unity.FPS.Gameplay
                 }
 
                 float chosenFootstepSfxFrequency =
-                    (isSprinting ? FootstepSfxFrequencyWhileSprinting : FootstepSfxFrequency);
+                    (sprintAmount > 0.5f
+                        ? FootstepSfxFrequencyWhileSprinting
+                        : FootstepSfxFrequency);
                 if (m_FootstepDistanceCounter >= 1f / chosenFootstepSfxFrequency)
                 {
                     m_FootstepDistanceCounter = 0f;

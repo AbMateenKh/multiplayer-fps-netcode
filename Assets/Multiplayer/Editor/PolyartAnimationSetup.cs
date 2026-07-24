@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Unity.FPS.Gameplay;
 using UnityEditor;
 using UnityEditor.Animations;
 using UnityEngine;
@@ -73,6 +74,12 @@ namespace Unity.FPS.Editor
 
             controller.AddParameter("MoveX", AnimatorControllerParameterType.Float);
             controller.AddParameter("MoveY", AnimatorControllerParameterType.Float);
+            controller.AddParameter(new AnimatorControllerParameter
+            {
+                name = "LocomotionRate",
+                type = AnimatorControllerParameterType.Float,
+                defaultFloat = 1f,
+            });
             controller.AddParameter("Grounded", AnimatorControllerParameterType.Bool);
             controller.AddParameter("Dead", AnimatorControllerParameterType.Bool);
             controller.AddParameter("Shoot", AnimatorControllerParameterType.Trigger);
@@ -120,10 +127,17 @@ namespace Unity.FPS.Editor
                 new Vector2(WalkBlendMagnitude, 0f));
 
             AnimatorState locomotion = AddState(machine, "Locomotion", locomotionTree);
+            locomotion.speedParameterActive = true;
+            locomotion.speedParameter = "LocomotionRate";
+            locomotion.AddStateMachineBehaviour<PolyartFootIkBehaviour>();
             AnimatorState jump = AddState(machine, "Jump", clips["Jump"]);
             AnimatorState death = AddState(machine, "Death", clips["Death"]);
             death.speed = 0.9f;
             machine.defaultState = locomotion;
+
+            AnimatorControllerLayer[] layers = controller.layers;
+            layers[0].iKPass = true;
+            controller.layers = layers;
 
             AnimatorStateTransition jumpTransition = machine.AddAnyStateTransition(jump);
             ConfigureImmediateTransition(jumpTransition, 0.06f);
@@ -217,6 +231,8 @@ namespace Unity.FPS.Editor
                 new Vector2(WalkBlendMagnitude, 0f));
 
             AnimatorState locomotion = AddState(machine, "Locomotion", locomotionTree);
+            locomotion.speedParameterActive = true;
+            locomotion.speedParameter = "LocomotionRate";
             AnimatorState jump = AddState(machine, "Jump", clips["Jump"]);
             AnimatorState death = AddState(machine, "Death", clips["Death"]);
             AnimatorState shoot = AddState(machine, "Shoot", clips["Shoot"]);

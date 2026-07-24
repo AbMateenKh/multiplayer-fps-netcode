@@ -18,6 +18,7 @@ namespace Unity.FPS.Gameplay
 
         static readonly int MoveXHash = Animator.StringToHash("MoveX");
         static readonly int MoveYHash = Animator.StringToHash("MoveY");
+        static readonly int LocomotionRateHash = Animator.StringToHash("LocomotionRate");
         static readonly int GroundedHash = Animator.StringToHash("Grounded");
         static readonly int DeadHash = Animator.StringToHash("Dead");
         static readonly int ShootHash = Animator.StringToHash("Shoot");
@@ -131,6 +132,11 @@ namespace Unity.FPS.Gameplay
                     m_LocalMove.Value.y,
                     LocomotionDamping,
                     Time.deltaTime);
+                CharacterAnimator.SetFloat(
+                    LocomotionRateHash,
+                    CalculateLocomotionRate(),
+                    LocomotionDamping,
+                    Time.deltaTime);
                 CharacterAnimator.SetBool(GroundedHash, m_Grounded.Value);
             }
 
@@ -176,6 +182,29 @@ namespace Unity.FPS.Gameplay
             }
         }
 
+        float CalculateLocomotionRate()
+        {
+            float moveMagnitude = m_LocalMove.Value.magnitude;
+            if (moveMagnitude < 0.02f || m_Character == null)
+                return 1f;
+
+            float walkBlendMagnitude = 1f / Mathf.Max(
+                1f,
+                m_Character.SprintSpeedModifier);
+            if (moveMagnitude <= walkBlendMagnitude)
+            {
+                return Mathf.Lerp(
+                    0.75f,
+                    1f,
+                    moveMagnitude / walkBlendMagnitude);
+            }
+
+            return Mathf.Lerp(
+                1f,
+                1.25f,
+                Mathf.InverseLerp(walkBlendMagnitude, 1f, moveMagnitude));
+        }
+
         void BindAuthoredPresentation()
         {
             if (CharacterRoot == null || CharacterAnimator == null)
@@ -192,6 +221,7 @@ namespace Unity.FPS.Gameplay
             CharacterAnimator.Rebind();
             CharacterAnimator.SetFloat(MoveXHash, 0f);
             CharacterAnimator.SetFloat(MoveYHash, 0f);
+            CharacterAnimator.SetFloat(LocomotionRateHash, 1f);
             CharacterAnimator.SetBool(GroundedHash, true);
             CharacterAnimator.Update(0f);
 

@@ -14,7 +14,7 @@ namespace Unity.FPS.Editor
         const string CharacterPrefabPath =
             "Assets/SciFiWarriorPBRHPPolyart/Prefabs/PolyartCharacter.prefab";
         const string CharacterRootName = "CharacterVisual";
-        const float GroundSpeed = 7.5f;
+        const float GroundSpeed = 6f;
         const float GroundAccelerationSharpness = 10f;
         static readonly Vector3 CharacterLocalPosition = Vector3.zero;
         static readonly Vector3 CharacterLocalScale = Vector3.one * 0.75f;
